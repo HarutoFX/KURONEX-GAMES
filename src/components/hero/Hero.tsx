@@ -52,23 +52,25 @@ function ResizableNav() {
                 xmlns="http://www.w3.org/2000/svg"
               >
                 <defs>
-                  <linearGradient id="vGradNav" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <linearGradient id="kGradNav" x1="0%" y1="0%" x2="100%" y2="100%">
                     <stop offset="0%" stopColor="#FF4054" />
                     <stop offset="100%" stopColor="#FF263D" />
                   </linearGradient>
-                  <linearGradient id="vCoreNav" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <linearGradient id="kCoreNav" x1="0%" y1="0%" x2="100%" y2="100%">
                     <stop offset="0%" stopColor="#FFFFFF" />
                     <stop offset="100%" stopColor="#FF4054" />
                   </linearGradient>
                 </defs>
-                <path d="M3 4L12 21L21 4H16.2L12 14.2L7.8 4H3Z" fill="url(#vGradNav)" />
-                <path d="M8.2 4L12 12.2L15.8 4H13.6L12 7.5L10.4 4H8.2Z" fill="url(#vCoreNav)" opacity="0.9" />
+                <path d="M4 4H8V20H4V4Z" fill="url(#kGradNav)" />
+                <path d="M9.5 12.2L16.2 4H20.5L13.2 12.2L20.8 20H16.5L9.5 12.2Z" fill="url(#kGradNav)" />
+                <path d="M5.2 5.5H6.8V18.5H5.2V5.5Z" fill="url(#kCoreNav)" opacity="0.9" />
+                <path d="M11 12.2L16 6H18L13 12.2L18.2 18.5H16.2L11 12.2Z" fill="url(#kCoreNav)" opacity="0.9" />
               </svg>
               <span className="absolute -bottom-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-[#FF263D] shadow-[0_0_6px_#FF263D]" />
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold tracking-[0.2em] text-[#F5F5F5] antialiased">
-                VYOMERA
+                KURONEX
               </span>
               <span className="rounded border border-[rgba(255,38,61,0.25)] bg-[rgba(255,38,61,0.10)] px-1.5 py-0.5 text-[9px] font-extrabold tracking-[0.16em] text-[#FF263D] shadow-[0_0_12px_rgba(255,38,61,0.10)]">
                 GAMES
@@ -106,10 +108,10 @@ function ResizableNav() {
           <NavbarLogo href="/">
             <div className="flex items-center gap-2.5">
               <div className="relative flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-[#07080A]">
-                <span className="text-xs font-black text-[#FF263D]">V</span>
+                <span className="text-xs font-black text-[#FF263D]">K</span>
               </div>
               <span className="text-xs font-bold tracking-[0.18em] text-[#F5F5F5]">
-                VYOMERA
+                KURONEX
               </span>
             </div>
           </NavbarLogo>

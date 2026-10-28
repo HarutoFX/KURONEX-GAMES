@@ -14,7 +14,7 @@ export function DotDistortionShader({
   gridSize = 80,
   dotSize = 2,
   glowRadius = 160,
-  highlightColor = "#38f5ff", // VYOMERA electric cyan
+  highlightColor = "#38f5ff", // KURONEX electric cyan
   className = "",
 }: AnimatedGridWithDotsProps) {
   const containerRef = useRef<HTMLDivElement>(null);

@@ -29,7 +29,8 @@ export interface Session {
 
 const DB_FILE = path.join(process.cwd(), "src", "data", "users.json");
 const SESSIONS_FILE = path.join(process.cwd(), "src", "data", "sessions.json");
-const SESSION_COOKIE_NAME = "vyomera_session";
+const SESSION_COOKIE_NAME = "kuronex_session";
+const LEGACY_SESSION_COOKIE_NAME = "vyomera_session";
 const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 // ─── Database Persistence Helpers ───────────────────────────────────────────
@@ -122,7 +123,7 @@ export function createUser(data: { username: string; email: string; password: st
   const { hash, salt } = hashPassword(data.password);
 
   const newUser: User = {
-    id: `vyo_${crypto.randomBytes(8).toString("hex")}`,
+    id: `kuro_${crypto.randomBytes(8).toString("hex")}`,
     username: data.username.trim(),
     email: data.email.trim().toLowerCase(),
     passwordHash: hash,
@@ -162,7 +163,9 @@ export function deleteSession(token: string) {
 
 export async function getCurrentUser(): Promise<SafeUser | null> {
   const cookieStore = await cookies();
-  const sessionToken = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+  const sessionToken =
+    cookieStore.get(SESSION_COOKIE_NAME)?.value ||
+    cookieStore.get(LEGACY_SESSION_COOKIE_NAME)?.value;
   if (!sessionToken) return null;
 
   const sessions = readSessions();
@@ -175,4 +178,4 @@ export async function getCurrentUser(): Promise<SafeUser | null> {
   return toSafeUser(user);
 }
 
-export { SESSION_COOKIE_NAME, SESSION_DURATION_MS };
+export { SESSION_COOKIE_NAME, LEGACY_SESSION_COOKIE_NAME, SESSION_DURATION_MS };

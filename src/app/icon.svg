@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <rect width="32" height="32" rx="8" fill="#020405" />
+  <rect width="32" height="32" rx="8" fill="none" stroke="rgba(255, 38, 61, 0.3)" stroke-width="1.5" />
+  <defs>
+    <linearGradient id="kIconGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF4054" />
+      <stop offset="100%" stop-color="#FF263D" />
+    </linearGradient>
+    <linearGradient id="kIconCore" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="100%" stop-color="#FF4054" />
+    </linearGradient>
+  </defs>
+  <path d="M7 6H12V26H7V6Z" fill="url(#kIconGrad)" />
+  <path d="M13.5 16L21.5 6H26.5L17.5 16L26.8 26H21.5L13.5 16Z" fill="url(#kIconGrad)" />
+  <path d="M8.5 8H10.5V24H8.5V8Z" fill="url(#kIconCore)" opacity="0.9" />
+  <path d="M15 16L21 8.5H23.5L17.5 16L23.8 23.5H21.2L15 16Z" fill="url(#kIconCore)" opacity="0.9" />
+  <circle cx="25" cy="7" r="1.5" fill="#FF263D" />
+</svg>

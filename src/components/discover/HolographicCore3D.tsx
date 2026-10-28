@@ -102,9 +102,12 @@ function ParticleField() {
   const positions = React.useMemo(() => {
     const pos = new Float32Array(count * 3);
     for (let i = 0; i < count; i++) {
-      pos[i * 3] = (Math.random() - 0.5) * 4.5;
-      pos[i * 3 + 1] = (Math.random() - 0.5) * 4.5;
-      pos[i * 3 + 2] = (Math.random() - 0.5) * 4.5;
+      const rx = (Math.sin(i * 12.9898) * 43758.5453) % 1;
+      const ry = (Math.sin(i * 78.233) * 43758.5453) % 1;
+      const rz = (Math.sin(i * 45.164) * 43758.5453) % 1;
+      pos[i * 3] = (rx - 0.5) * 4.5;
+      pos[i * 3 + 1] = (ry - 0.5) * 4.5;
+      pos[i * 3 + 2] = (rz - 0.5) * 4.5;
     }
     return pos;
   }, []);

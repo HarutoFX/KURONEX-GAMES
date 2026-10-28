@@ -62,14 +62,16 @@ export function DiscoverPage({ hideNavbar = false }: { hideNavbar?: boolean }) {
                         <stop offset="100%" stopColor="#00E5FF" />
                       </linearGradient>
                     </defs>
-                    <path d="M3 4L12 21L21 4H16.2L12 14.2L7.8 4H3Z" fill="url(#navDiscGrad)" />
-                    <path d="M8.2 4L12 12.2L15.8 4H13.6L12 7.5L10.4 4H8.2Z" fill="url(#navDiscCore)" opacity="0.9" />
+                    <path d="M4 4H8V20H4V4Z" fill="url(#navDiscGrad)" />
+                    <path d="M9.5 12.2L16.2 4H20.5L13.2 12.2L20.8 20H16.5L9.5 12.2Z" fill="url(#navDiscGrad)" />
+                    <path d="M5.2 5.5H6.8V18.5H5.2V5.5Z" fill="url(#navDiscCore)" opacity="0.9" />
+                    <path d="M11 12.2L16 6H18L13 12.2L18.2 18.5H16.2L11 12.2Z" fill="url(#navDiscCore)" opacity="0.9" />
                   </svg>
                   <span className="absolute -bottom-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-[#00E5FF] shadow-[0_0_8px_#00E5FF]" />
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-bold tracking-[0.2em] text-[#F5F5F5] antialiased">
-                    VYOMERA
+                    KURONEX
                   </span>
                   <span className="rounded border border-[#00E5FF]/30 bg-[#00E5FF]/10 px-1.5 py-0.5 text-[9px] font-extrabold tracking-[0.16em] text-[#00E5FF] shadow-[0_0_12px_rgba(0,229,255,0.15)]">
                     GAMES
@@ -107,10 +109,10 @@ export function DiscoverPage({ hideNavbar = false }: { hideNavbar?: boolean }) {
               <NavbarLogo href="/">
                 <div className="flex items-center gap-2.5">
                   <div className="relative flex h-7 w-7 items-center justify-center rounded-lg border border-[#00E5FF]/30 bg-[#07080A]">
-                    <span className="text-xs font-black text-[#00E5FF]">V</span>
+                    <span className="text-xs font-black text-[#00E5FF]">K</span>
                   </div>
                   <span className="text-xs font-bold tracking-[0.18em] text-[#F5F5F5]">
-                    VYOMERA
+                    KURONEX
                   </span>
                 </div>
               </NavbarLogo>
@@ -222,9 +224,9 @@ export function DiscoverPage({ hideNavbar = false }: { hideNavbar?: boolean }) {
       <footer className="relative z-10 border-t border-white/10 bg-[#020508]/80 py-8 text-center text-xs text-[#8F9298] backdrop-blur-md">
         <div className="mx-auto max-w-7xl px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <span className="font-bold tracking-widest text-[#F5F5F5]">VYOMERA GAMES</span>
+            <span className="font-bold tracking-widest text-[#F5F5F5]">KURONEX GAMES</span>
             <span>•</span>
-            <span>© 2026 Vyomera Inc. All rights reserved.</span>
+            <span>© 2026 Kuronex Inc. All rights reserved.</span>
           </div>
           <div className="flex items-center gap-6">
             <Link href="#privacy" className="hover:text-[#00E5FF] transition">Privacy Policy</Link>

@@ -43,7 +43,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    refreshUser();
+    let ignore = false;
+    async function loadUser() {
+      try {
+        const res = await fetch("/api/auth/me", { cache: "no-store" });
+        if (res.ok) {
+          const data = await res.json();
+          if (!ignore) setUser(data.user || null);
+        } else {
+          if (!ignore) setUser(null);
+        }
+      } catch (err) {
+        console.error("Failed to fetch session user:", err);
+        if (!ignore) setUser(null);
+      } finally {
+        if (!ignore) setIsLoading(false);
+      }
+    }
+    loadUser();
+    return () => {
+      ignore = true;
+    };
   }, []);
 
   const login = async (identifier: string, password: string) => {
@@ -61,7 +81,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setUser(data.user);
       return { success: true };
-    } catch (err) {
+    } catch {
       return { success: false, error: "Network error. Please try again." };
     }
   };
@@ -81,7 +101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setUser(data.user);
       return { success: true };
-    } catch (err) {
+    } catch {
       return { success: false, error: "Network error. Please try again." };
     }
   };

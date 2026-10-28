@@ -76,7 +76,6 @@ export function CyberGridBackground({
 
     const hOffsets = new Float32Array(hLines.length);
     const vOffsets = new Float32Array(vLines.length);
-    let isRunning = false;
     let time = 0;
 
     const lerp = (start: number, end: number, factor: number) =>
@@ -165,7 +164,6 @@ export function CyberGridBackground({
     };
 
     // Continuous smooth animation loop
-    isRunning = true;
     animFrameRef.current = requestAnimationFrame(animate);
 
     // Track mouse globally across window

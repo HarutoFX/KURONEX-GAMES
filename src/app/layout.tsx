@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
-import { VyomeraBackground } from "@/components/background/VyomeraBackground";
+import { KuronexBackground } from "@/components/background/KuronexBackground";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -11,9 +11,22 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 import { AuthProvider } from "@/context/AuthContext";
 
 export const metadata: Metadata = {
-  title: "VYOMERA GAMES — Build Your Own Library",
+  title: "KURONEX GAMES — Build Your Own Library",
   description:
-    "VYOMERA GAMES is a next-generation gaming platform built around your personal game library.",
+    "KURONEX GAMES is a next-generation gaming platform built around your personal game library.",
+  openGraph: {
+    title: "KURONEX GAMES — Build Your Own Library",
+    description:
+      "KURONEX GAMES is a next-generation gaming platform built around your personal game library.",
+    siteName: "KURONEX GAMES",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "KURONEX GAMES — Build Your Own Library",
+    description:
+      "KURONEX GAMES is a next-generation gaming platform built around your personal game library.",
+  },
 };
 
 export default function RootLayout({
@@ -25,11 +38,11 @@ export default function RootLayout({
     <html lang="en" className={plusJakartaSans.className}>
       <body className="antialiased">
         {/*
-          VyomeraBackground is position:fixed, z-index:0, pointer-events:none.
+          KuronexBackground is position:fixed, z-index:0, pointer-events:none.
           It sits behind all page content on every route.
           Mounted once here — never duplicated per-page.
         */}
-        <VyomeraBackground />
+        <KuronexBackground />
         {/*
           Page content sits above the background via relative positioning.
           All pages must have a transparent (or semi-transparent) background

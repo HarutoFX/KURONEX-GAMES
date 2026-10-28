@@ -6,6 +6,7 @@ import {
   createSession,
   toSafeUser,
   SESSION_COOKIE_NAME,
+  LEGACY_SESSION_COOKIE_NAME,
   SESSION_DURATION_MS,
 } from "@/lib/auth";
 
@@ -66,6 +67,16 @@ export async function POST(req: NextRequest) {
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       maxAge: SESSION_DURATION_MS / 1000,
+      path: "/",
+    });
+
+    response.cookies.set({
+      name: LEGACY_SESSION_COOKIE_NAME,
+      value: "",
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 0,
       path: "/",
     });
 

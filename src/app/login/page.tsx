@@ -60,23 +60,25 @@ export default function LoginPage() {
           <div className="relative flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-[#07080A] shadow-[0_0_16px_rgba(255,38,61,0.12)] backdrop-blur-md transition-all duration-300 group-hover:border-[rgba(255,38,61,0.4)] group-hover:shadow-[0_0_24px_rgba(255,38,61,0.25)]">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <defs>
-                <linearGradient id="vGradLogin" x1="0%" y1="0%" x2="100%" y2="100%">
+                <linearGradient id="kGradLogin" x1="0%" y1="0%" x2="100%" y2="100%">
                   <stop offset="0%" stopColor="#FF4054" />
                   <stop offset="100%" stopColor="#FF263D" />
                 </linearGradient>
-                <linearGradient id="vCoreLogin" x1="0%" y1="0%" x2="100%" y2="100%">
+                <linearGradient id="kCoreLogin" x1="0%" y1="0%" x2="100%" y2="100%">
                   <stop offset="0%" stopColor="#FFFFFF" />
                   <stop offset="100%" stopColor="#FF4054" />
                 </linearGradient>
               </defs>
-              <path d="M3 4L12 21L21 4H16.2L12 14.2L7.8 4H3Z" fill="url(#vGradLogin)" />
-              <path d="M8.2 4L12 12.2L15.8 4H13.6L12 7.5L10.4 4H8.2Z" fill="url(#vCoreLogin)" opacity="0.9" />
+              <path d="M4 4H8V20H4V4Z" fill="url(#kGradLogin)" />
+              <path d="M9.5 12.2L16.2 4H20.5L13.2 12.2L20.8 20H16.5L9.5 12.2Z" fill="url(#kGradLogin)" />
+              <path d="M5.2 5.5H6.8V18.5H5.2V5.5Z" fill="url(#kCoreLogin)" opacity="0.9" />
+              <path d="M11 12.2L16 6H18L13 12.2L18.2 18.5H16.2L11 12.2Z" fill="url(#kCoreLogin)" opacity="0.9" />
             </svg>
             <span className="absolute -bottom-0.5 -right-0.5 h-1.5 w-1.5 rounded-full bg-[#FF263D] shadow-[0_0_6px_#FF263D]" />
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold tracking-[0.2em] text-[#F5F5F5]">
-              VYOMERA
+              KURONEX
             </span>
             <span className="rounded border border-[rgba(255,38,61,0.25)] bg-[rgba(255,38,61,0.10)] px-1.5 py-0.5 text-[9px] font-extrabold tracking-[0.16em] text-[#FF263D]">
               GAMES
@@ -145,7 +147,7 @@ export default function LoginPage() {
                   required
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
-                  placeholder="player@vyomera.com or Gamertag"
+                  placeholder="player@kuronex.com or Gamertag"
                   className="w-full rounded-2xl border border-white/10 bg-[rgba(15,20,28,0.7)] py-3 pl-11 pr-4 text-sm text-[#F5F5F5] placeholder-[#606368] outline-none transition focus:border-[#FF263D]/60 focus:shadow-[0_0_20px_rgba(255,38,61,0.2)]"
                 />
               </div>
@@ -161,7 +163,7 @@ export default function LoginPage() {
                   href="#"
                   onClick={(e) => {
                     e.preventDefault();
-                    setErrorMessage("Password recovery is currently managed via support@vyomera.com");
+                    setErrorMessage("Password recovery is currently managed via support@kuronex.com");
                   }}
                   className="text-[11px] text-[#8F9298] hover:text-[#FF4054] transition"
                 >
@@ -269,7 +271,7 @@ export default function LoginPage() {
 
       {/* ─── Page Footer ─────────────────────────────────────────────────── */}
       <footer className="relative z-10 w-full max-w-6xl mx-auto py-4 text-center text-[11px] text-[#8F9298] flex flex-col sm:flex-row items-center justify-between gap-3">
-        <span>© 2026 VYOMERA GAMES Inc. All rights reserved.</span>
+        <span>© 2026 KURONEX GAMES Inc. All rights reserved.</span>
         <div className="flex items-center gap-6">
           <Link href="#privacy" className="hover:text-[#F5F5F5] transition">Privacy Policy</Link>
           <Link href="#terms" className="hover:text-[#F5F5F5] transition">Terms of Service</Link>
