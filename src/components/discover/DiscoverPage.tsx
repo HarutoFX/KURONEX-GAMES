@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import {
   Search,
@@ -41,7 +41,12 @@ export function DiscoverPage({ hideNavbar = false }: { hideNavbar?: boolean }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [emailInput, setEmailInput] = useState("");
   const [isSubscribed, setIsSubscribed] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const { user, logout, library } = useAuth();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleSubscribe = (e: React.FormEvent) => {
     e.preventDefault();
@@ -119,7 +124,7 @@ export function DiscoverPage({ hideNavbar = false }: { hideNavbar?: boolean }) {
               >
                 <Bookmark className="h-3.5 w-3.5 text-[#FF4054]" />
                 <span>Library</span>
-                {library.length > 0 && (
+                {mounted && library.length > 0 && (
                   <span className="ml-1 rounded-full bg-[#FF263D] px-1.5 py-0.2 text-[10px] font-bold text-white">
                     {library.length}
                   </span>
@@ -192,7 +197,7 @@ export function DiscoverPage({ hideNavbar = false }: { hideNavbar?: boolean }) {
               >
                 <span>My Library</span>
                 <span className="rounded-full bg-[#FF263D]/20 px-2 py-0.5 text-xs text-[#FF4054]">
-                  {library.length}
+                  {mounted ? library.length : 0}
                 </span>
               </Link>
               {user ? (

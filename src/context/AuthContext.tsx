@@ -27,17 +27,18 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<SafeUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [library, setLibrary] = useState<string[]>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const saved = localStorage.getItem("kuronex_user_library");
-        if (saved) return JSON.parse(saved);
-      } catch {
-        // fallback
+  const [library, setLibrary] = useState<string[]>(["neon-haven", "voidstrike"]);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("kuronex_user_library");
+      if (saved) {
+        setLibrary(JSON.parse(saved));
       }
+    } catch {
+      // fallback
     }
-    return ["neon-haven", "voidstrike"];
-  });
+  }, []);
 
   const toggleLibraryGame = (gameId: string) => {
     setLibrary((prev) => {
