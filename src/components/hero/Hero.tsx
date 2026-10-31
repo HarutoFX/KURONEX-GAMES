@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { motion, useScroll, useTransform } from "framer-motion";
-import { ArrowRight, Play } from "lucide-react";
+import { ArrowRight, Play, Shield } from "lucide-react";
 
 import {
   Navbar,
@@ -21,7 +22,7 @@ import { useState } from "react";
 const navItems = [
   {
     name: "Discover",
-    link: "#discover",
+    link: "/discover",
   },
   {
     name: "Library",
@@ -29,7 +30,11 @@ const navItems = [
   },
   {
     name: "Developers",
-    link: "#developers",
+    link: "/developers",
+  },
+  {
+    name: "Download",
+    link: "/download",
   },
 ];
 
@@ -83,6 +88,15 @@ function ResizableNav() {
 
         {user ? (
           <div className="flex items-center gap-3">
+            {user.role === "admin" && (
+              <Link
+                href="/admin"
+                className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-[#FF263D]/40 bg-[#FF263D]/10 px-3 py-1.5 text-xs font-bold text-[#FF4054] hover:bg-[#FF263D]/20 transition"
+              >
+                <Shield className="h-3.5 w-3.5" />
+                <span>Admin</span>
+              </Link>
+            )}
             <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 py-1.5 px-3 backdrop-blur-md">
               <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
               <span className="text-xs font-semibold text-[#F5F5F5]">{user.username}</span>
@@ -220,15 +234,15 @@ export function Hero() {
 
           {/* CTA Buttons */}
           <div className="hero-actions">
-            <a href="#discover" className="button button-primary">
-              Explore Games
+            <Link href="/library" className="button button-primary">
+              Explore Library
               <ArrowRight size={16} aria-hidden="true" />
-            </a>
+            </Link>
 
-            <button className="button button-secondary">
+            <Link href="/download" className="button button-secondary">
               <Play size={15} aria-hidden="true" />
-              See How It Works
-            </button>
+              Upcoming Client App
+            </Link>
           </div>
         </div>
       </div>
