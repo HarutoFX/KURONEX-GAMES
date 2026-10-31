@@ -521,6 +521,9 @@ function Scene({ mouse }: { mouse?: { x: number; y: number } }) {
       <GeometricTile position={[3.1, 1.1, -1.6]} driftSpeed={0.08} />
       <GeometricTile position={[-2.6, -1.5, -1.4]} driftSpeed={0.06} />
 
+      {/* ── Particle Field ───────────────────────────────────────── */}
+      <Particles />
+
       <Environment preset="night" environmentIntensity={0.2} />
     </>
   );

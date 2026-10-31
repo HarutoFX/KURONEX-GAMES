@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import Link from "next/link";
 import { IconMenu2, IconX } from "@tabler/icons-react";
 import {
   motion,
@@ -236,17 +237,26 @@ export const MobileNavMenu = ({
   return (
     <AnimatePresence>
       {isOpen && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          className={cn(
-            "absolute inset-x-0 top-full mt-2 z-50 flex w-full flex-col items-start justify-start gap-4 rounded-2xl border border-white/10 bg-[#07080A]/95 p-6 shadow-2xl backdrop-blur-2xl",
-            className,
-          )}
-        >
-          {children}
-        </motion.div>
+        <>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="fixed inset-0 z-40 bg-black/60 backdrop-blur-xs"
+          />
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className={cn(
+              "absolute inset-x-0 top-full mt-2 z-50 flex w-full flex-col items-start justify-start gap-4 rounded-2xl border border-white/10 bg-[#07080A]/95 p-6 shadow-2xl backdrop-blur-2xl",
+              className,
+            )}
+          >
+            {children}
+          </motion.div>
+        </>
       )}
     </AnimatePresence>
   );
@@ -279,14 +289,14 @@ export const NavbarLogo = ({
 }) => {
   if (children) {
     return (
-      <a href={href} className="relative z-20 flex items-center">
+      <Link href={href} className="relative z-20 flex items-center">
         {children}
-      </a>
+      </Link>
     );
   }
 
   return (
-    <a
+    <Link
       href={href}
       className="relative z-20 flex items-center gap-3 transition hover:opacity-95"
     >
@@ -322,7 +332,7 @@ export const NavbarLogo = ({
           GAMES
         </span>
       </div>
-    </a>
+    </Link>
   );
 };
 
@@ -372,13 +382,13 @@ export const NavbarButton = ({
 
   if (href) {
     return (
-      <a
+      <Link
         href={href}
         className={cn(baseStyles, variantStyles[variant], className)}
         {...(props as React.AnchorHTMLAttributes<HTMLAnchorElement>)}
       >
         {children}
-      </a>
+      </Link>
     );
   }
 

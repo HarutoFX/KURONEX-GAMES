@@ -25,7 +25,7 @@ const navItems = [
   },
   {
     name: "Library",
-    link: "#library",
+    link: "/library",
   },
   {
     name: "Developers",

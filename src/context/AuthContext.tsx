@@ -13,10 +13,13 @@ export interface SafeUser {
 interface AuthContextType {
   user: SafeUser | null;
   isLoading: boolean;
+  library: string[];
   login: (identifier: string, password: string) => Promise<{ success: boolean; error?: string }>;
   register: (username: string, email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  toggleLibraryGame: (gameId: string) => void;
+  isInLibrary: (gameId: string) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -24,6 +27,33 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<SafeUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [library, setLibrary] = useState<string[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("kuronex_user_library");
+        if (saved) return JSON.parse(saved);
+      } catch {
+        // fallback
+      }
+    }
+    return ["neon-haven", "voidstrike"];
+  });
+
+  const toggleLibraryGame = (gameId: string) => {
+    setLibrary((prev) => {
+      const next = prev.includes(gameId)
+        ? prev.filter((id) => id !== gameId)
+        : [...prev, gameId];
+      try {
+        localStorage.setItem("kuronex_user_library", JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  };
+
+  const isInLibrary = (gameId: string) => library.includes(gameId);
 
   const refreshUser = async () => {
     try {
@@ -117,7 +147,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, logout, refreshUser }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        isLoading,
+        library,
+        login,
+        register,
+        logout,
+        refreshUser,
+        toggleLibraryGame,
+        isInLibrary,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
