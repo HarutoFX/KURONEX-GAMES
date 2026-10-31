@@ -62,3 +62,4 @@ export function DeveloperMarquee({ developers }: DeveloperMarqueeProps) {
     </div>
   );
 }
+

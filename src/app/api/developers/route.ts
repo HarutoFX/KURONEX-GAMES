@@ -12,3 +12,4 @@ export async function GET() {
     return NextResponse.json({ error: "Failed to fetch developers", developers: [] }, { status: 500 });
   }
 }
+

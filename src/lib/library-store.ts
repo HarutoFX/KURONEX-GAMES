@@ -108,3 +108,4 @@ export function updateDeveloper(updatedDev: DeveloperPartner): boolean {
   }
   return saveDevelopers(devs);
 }
+
