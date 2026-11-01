@@ -4,6 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { ParticleBackground } from "./ParticleBackground";
+import { MagicCard } from "@/components/ui/magic-card";
 
 interface AuthLayoutProps {
   children: React.ReactNode;
@@ -85,12 +86,13 @@ export function AuthLayout({
         </Link>
       </header>
 
-      {/* ─── Centered Authentication Panel ─────────────────────────────────── */}
+      {/* ─── Centered Authentication Panel with Magic Card Spotlight Effect ─── */}
       <main className="relative z-10 w-full max-w-[440px] mx-auto px-4 py-8 sm:py-12 my-auto">
-        <div className="relative overflow-hidden rounded-2xl border border-[#292929] bg-[#111111] p-6 sm:p-8 md:p-9 shadow-[0_24px_60px_rgba(0,0,0,0.8)] transition-all duration-300">
-          {/* Subtle top accent edge */}
-          <div className="pointer-events-none absolute top-0 inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-[#FF263D]/60 to-transparent" />
-
+        <MagicCard
+          gradientColor="rgba(255, 38, 61, 0.35)"
+          gradientSize={260}
+          className="p-6 sm:p-8 md:p-9 shadow-[0_24px_60px_rgba(0,0,0,0.8)]"
+        >
           {/* Header Typography */}
           <div className="mb-7 text-center">
             {/* Small Section Label */}
@@ -125,7 +127,7 @@ export function AuthLayout({
               {footerLinkText}
             </Link>
           </div>
-        </div>
+        </MagicCard>
       </main>
 
       {/* ─── Page Legal Footer ────────────────────────────────────────────── */}

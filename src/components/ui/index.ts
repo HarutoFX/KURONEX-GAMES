@@ -12,4 +12,7 @@ export * from "./error-boundary";
 export * from "./navigation";
 export * from "./resizable-navbar";
 export * from "./floating-dock";
+export * from "./magic-card";
+export * from "./label";
+
 
