@@ -9,6 +9,7 @@ import {
   SESSION_DURATION_MS,
 } from "@/lib/auth";
 import { checkRateLimit, getClientIp } from "@/lib/security/rate-limiter";
+import { trackEvent } from "@/lib/analytics/event-tracker";
 
 export async function POST(req: NextRequest) {
   try {
@@ -93,6 +94,14 @@ export async function POST(req: NextRequest) {
     // 3. Create User & Session
     const user = createUser({ username: trimmedUsername, email: trimmedEmail, password });
     const sessionToken = createSession(user.id, req);
+
+    // Track genuine registration event
+    trackEvent({
+      eventType: "user.registered",
+      category: "auth",
+      userId: user.id,
+      metadata: { username: user.username },
+    });
 
     // 4. Return user & set HTTP-only cookie
     const response = NextResponse.json(

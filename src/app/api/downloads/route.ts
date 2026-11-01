@@ -9,6 +9,7 @@ import {
 import { getSessionUser } from "@/lib/auth";
 import { parsePagination } from "@/lib/api/validators";
 import { checkRateLimit, getClientIp } from "@/lib/security/rate-limiter";
+import { trackEvent } from "@/lib/analytics/event-tracker";
 
 export const dynamic = "force-dynamic";
 
@@ -92,6 +93,19 @@ export async function POST(req: NextRequest) {
       platform: validPlatform,
       version: validVersion,
       userId: user?.id,
+    });
+
+    // Track genuine download completion event
+    trackEvent({
+      eventType: "download.completed",
+      category: "downloads",
+      userId: user?.id,
+      resourceId: validItemId,
+      metadata: {
+        itemType: validItemType,
+        platform: validPlatform,
+        version: validVersion,
+      },
     });
 
     return NextResponse.json({ success: true, event }, { status: 201 });

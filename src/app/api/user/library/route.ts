@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser, updateUserLibrary } from "@/lib/auth";
 import { checkRateLimit, getClientIp } from "@/lib/security/rate-limiter";
+import { trackEvent } from "@/lib/analytics/event-tracker";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +48,16 @@ export async function POST(req: NextRequest) {
 
     const validAction = action === "add" || action === "remove" ? action : "toggle";
     const updatedLibrary = updateUserLibrary(user.id, sanitizedGameId, validAction);
+
+    // Track genuine library engagement event
+    const wasAdded = updatedLibrary.includes(sanitizedGameId);
+    trackEvent({
+      eventType: wasAdded ? "library.game_added" : "library.game_removed",
+      category: "engagement",
+      userId: user.id,
+      resourceId: sanitizedGameId,
+      metadata: { action: wasAdded ? "added" : "removed" },
+    });
 
     return NextResponse.json({ success: true, library: updatedLibrary }, { status: 200 });
   } catch (error) {

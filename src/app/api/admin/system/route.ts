@@ -16,6 +16,7 @@ import {
 } from "@/lib/admin-store";
 import { getLibraryGames, getDevelopers } from "@/lib/library-store";
 import { GAMES_DATA } from "@/lib/games";
+import { calculateAnalyticsSummary } from "@/lib/analytics/event-tracker";
 
 export const dynamic = "force-dynamic";
 
@@ -72,6 +73,7 @@ export async function GET(req: NextRequest) {
         announcements,
         settings,
         metrics,
+        analytics: calculateAnalyticsSummary("7D"),
       },
       { status: 200 }
     );

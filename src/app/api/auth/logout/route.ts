@@ -6,9 +6,11 @@ import {
   SESSION_COOKIE_NAME,
   LEGACY_SESSION_COOKIE_NAME,
 } from "@/lib/auth";
+import { trackEvent } from "@/lib/analytics/event-tracker";
 
 export async function POST(req: NextRequest) {
   try {
+    const user = await getSessionUser(req);
     const sessionToken =
       req.cookies.get(SESSION_COOKIE_NAME)?.value ||
       req.cookies.get(LEGACY_SESSION_COOKIE_NAME)?.value;
@@ -18,12 +20,19 @@ export async function POST(req: NextRequest) {
     const revokeAll = url.searchParams.get("all") === "true" || body.all === true;
 
     if (revokeAll) {
-      const user = await getSessionUser(req);
       if (user) {
         revokeAllUserSessions(user.id);
       }
     } else if (sessionToken) {
       deleteSession(sessionToken);
+    }
+
+    if (user) {
+      trackEvent({
+        eventType: "user.logout",
+        category: "auth",
+        userId: user.id,
+      });
     }
 
     const response = NextResponse.json(

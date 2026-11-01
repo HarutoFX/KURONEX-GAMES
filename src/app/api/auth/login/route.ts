@@ -17,6 +17,7 @@ import {
   recordFailedLogin,
   recordSuccessfulLogin,
 } from "@/lib/security/rate-limiter";
+import { trackEvent } from "@/lib/analytics/event-tracker";
 
 export async function POST(req: NextRequest) {
   try {
@@ -134,6 +135,14 @@ export async function POST(req: NextRequest) {
 
     // Clear failed attempts counter upon verified credentials
     recordSuccessfulLogin(loginId);
+
+    // Track genuine login event
+    trackEvent({
+      eventType: "user.login",
+      category: "auth",
+      userId: user.id,
+      metadata: { username: user.username },
+    });
 
     // 6. Create session with client metadata
     const sessionToken = createSession(user.id, req);
