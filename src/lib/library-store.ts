@@ -1,5 +1,5 @@
-import fs from "fs";
 import path from "path";
+import { atomicWriteJsonSync, safeReadJsonSync } from "@/lib/db/atomic-store";
 
 export interface LibraryGameSlot {
   id: string;
@@ -33,31 +33,13 @@ export interface DeveloperPartner {
 const GAMES_FILE = path.join(process.cwd(), "src", "data", "library-games.json");
 const DEVELOPERS_FILE = path.join(process.cwd(), "src", "data", "developers.json");
 
-function ensureFile(filePath: string, defaultContent: string) {
-  const dir = path.dirname(filePath);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  if (!fs.existsSync(filePath)) {
-    fs.writeFileSync(filePath, defaultContent, "utf-8");
-  }
-}
-
 export function getLibraryGames(): LibraryGameSlot[] {
-  try {
-    ensureFile(GAMES_FILE, "[]");
-    const data = fs.readFileSync(GAMES_FILE, "utf-8");
-    return JSON.parse(data || "[]");
-  } catch (error) {
-    console.error("Failed to read library games:", error);
-    return [];
-  }
+  return safeReadJsonSync<LibraryGameSlot[]>(GAMES_FILE, []);
 }
 
 export function saveLibraryGames(games: LibraryGameSlot[]): boolean {
   try {
-    ensureFile(GAMES_FILE, "[]");
-    fs.writeFileSync(GAMES_FILE, JSON.stringify(games, null, 2), "utf-8");
+    atomicWriteJsonSync(GAMES_FILE, games);
     return true;
   } catch (error) {
     console.error("Failed to write library games:", error);
@@ -77,20 +59,12 @@ export function updateLibraryGameSlot(updatedSlot: LibraryGameSlot): boolean {
 }
 
 export function getDevelopers(): DeveloperPartner[] {
-  try {
-    ensureFile(DEVELOPERS_FILE, "[]");
-    const data = fs.readFileSync(DEVELOPERS_FILE, "utf-8");
-    return JSON.parse(data || "[]");
-  } catch (error) {
-    console.error("Failed to read developers:", error);
-    return [];
-  }
+  return safeReadJsonSync<DeveloperPartner[]>(DEVELOPERS_FILE, []);
 }
 
 export function saveDevelopers(devs: DeveloperPartner[]): boolean {
   try {
-    ensureFile(DEVELOPERS_FILE, "[]");
-    fs.writeFileSync(DEVELOPERS_FILE, JSON.stringify(devs, null, 2), "utf-8");
+    atomicWriteJsonSync(DEVELOPERS_FILE, devs);
     return true;
   } catch (error) {
     console.error("Failed to write developers:", error);

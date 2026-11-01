@@ -1,19 +1,39 @@
 @import "tailwindcss";
 
+@theme {
+  --color-brand-bg: #080808;
+  --color-brand-surface: #111111;
+  --color-brand-surface-secondary: #181818;
+  --color-brand-text: #FFFFFF;
+  --color-brand-muted: #929292;
+  --color-brand-accent: #FF263D;
+  --color-brand-accent-hover: #FF4054;
+  --color-brand-border: #292929;
+}
+
 :root {
   color-scheme: dark;
 
-  --void: #020405;
-  --background: #020405;
-  --surface: #07080A;
-  --surface-strong: rgba(7, 8, 10, 0.82);
+  --brand-bg: #080808;
+  --brand-surface: #111111;
+  --brand-surface-secondary: #181818;
+  --brand-text: #FFFFFF;
+  --brand-muted: #929292;
+  --brand-accent: #FF263D;
+  --brand-accent-hover: #FF4054;
+  --brand-border: #292929;
 
-  --text-primary: #F5F5F5;
-  --text-secondary: #8F9298;
+  --void: #080808;
+  --background: #080808;
+  --surface: #111111;
+  --surface-strong: rgba(17, 17, 17, 0.88);
+
+  --text-primary: #FFFFFF;
+  --text-secondary: #929292;
   --brand-red: #FF263D;
   --hover-red: #FF4054;
-  --border-color: rgba(255, 255, 255, 0.10);
-  --red-glow: rgba(255, 38, 61, 0.10);
+  --border-color: #292929;
+  --red-glow: rgba(255, 38, 61, 0.15);
 
   --white: #F5F5F5;
   --white-soft: #e5e5e5;
@@ -665,4 +685,26 @@ a {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* Accessibility: Skip Link */
+.skip-link {
+  position: absolute;
+  top: -9999px;
+  left: 1rem;
+  z-index: 100;
+  padding: 0.75rem 1.5rem;
+  background: var(--brand-accent);
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 0.875rem;
+  border-radius: 9999px;
+  box-shadow: 0 0 20px rgba(255, 38, 61, 0.5);
+  transition: top 0.2s ease-in-out;
+}
+
+.skip-link:focus {
+  top: 1rem;
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
 }

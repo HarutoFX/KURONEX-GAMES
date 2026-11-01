@@ -2,7 +2,8 @@
 
 import React, { useRef, useState } from "react";
 import Image from "next/image";
-import { Check, Bell, Sparkles } from "lucide-react";
+import { Check, Bookmark, Sparkles } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 export interface ProjectCartridgeCardProps {
   id?: string;
@@ -20,6 +21,7 @@ export interface ProjectCartridgeCardProps {
 }
 
 export function ProjectCartridgeCard({
+  id,
   projectCode,
   title,
   tagline,
@@ -32,10 +34,13 @@ export function ProjectCartridgeCard({
   coverImage,
   icon: Icon = Sparkles,
 }: ProjectCartridgeCardProps) {
+  const { library, toggleLibraryGame } = useAuth();
   const cardRef = useRef<HTMLDivElement>(null);
   const [rotate, setRotate] = useState({ x: 0, y: 0 });
   const [glare, setGlare] = useState({ x: 50, y: 50, opacity: 0 });
-  const [isNotified, setIsNotified] = useState(false);
+
+  const gameId = id || projectCode.toLowerCase().replace(/[^a-z0-9_-]/g, "");
+  const isInLibrary = library.includes(gameId);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!cardRef.current) return;
@@ -209,23 +214,24 @@ export function ProjectCartridgeCard({
           </span>
 
           <button
-            onClick={() => setIsNotified(!isNotified)}
-            aria-label={`Save ${projectCode}`}
+            type="button"
+            onClick={() => toggleLibraryGame(gameId)}
+            aria-label={`Save ${projectCode} to library`}
             className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-bold transition-all duration-200 cursor-pointer ${
-              isNotified
+              isInLibrary
                 ? "border border-[#FF263D] bg-[#FF263D] text-white shadow-[0_0_18px_rgba(255,38,61,0.5)]"
                 : "border border-white/10 bg-white/5 text-[#8F9298] hover:border-[#FF263D]/50 hover:text-[#FF4054] hover:bg-[#FF263D]/10"
             }`}
           >
-            {isNotified ? (
+            {isInLibrary ? (
               <>
                 <Check className="h-3.5 w-3.5" />
-                <span>Added to Library</span>
+                <span>In Library</span>
               </>
             ) : (
               <>
-                <Bell className="h-3.5 w-3.5" />
-                <span>Wishlist</span>
+                <Bookmark className="h-3.5 w-3.5" />
+                <span>Add to Library</span>
               </>
             )}
           </button>

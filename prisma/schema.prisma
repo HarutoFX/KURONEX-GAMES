@@ -1,0 +1,411 @@
+// KURONEX GAMES - Production Database Schema
+// Normalized PostgreSQL Model Architecture with Prisma ORM
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ─── ENUMS ──────────────────────────────────────────────────────────────────
+
+enum RoleName {
+  PLAYER
+  DEVELOPER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum PartnerTier {
+  PREMIER_PARTNER
+  STUDIO_PARTNER
+  INDIE_PIONEER
+}
+
+enum TargetPlatform {
+  WINDOWS
+  MACOS
+  LINUX
+  WEB
+  OTHER
+}
+
+enum DownloadItemType {
+  CLIENT
+  GAME
+}
+
+enum LibraryItemStatus {
+  IN_LIBRARY
+  INSTALLED
+  FAVORITE
+  ARCHIVED
+}
+
+enum AnnouncementPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum AnnouncementCategory {
+  UPDATE
+  MAINTENANCE
+  COMMUNITY
+  PROMOTION
+}
+
+enum PromoType {
+  SPOTLIGHT
+  PLAYTEST_KEY_DROP
+  SEASONAL_BANNER
+  DISCOUNT
+}
+
+enum AuditCategory {
+  GAMES
+  USERS
+  SYSTEM
+  CMS
+  AUTH
+  SETTINGS
+}
+
+enum AuditStatus {
+  SUCCESS
+  WARNING
+  FAILED
+}
+
+// ─── AUTHENTICATION & ACCESS CONTROL ────────────────────────────────────────
+
+model User {
+  id           String        @id @default(cuid())
+  username     String        @unique
+  email        String        @unique
+  passwordHash String
+  salt         String
+  roleId       String
+  role         Role          @relation(fields: [roleId], references: [id])
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  sessions       Session[]
+  library        UserLibrary[]
+  downloadEvents DownloadEvent[]
+  announcements  Announcement[]
+  reviews        Review[]
+  ratings        Rating[]
+  auditLogs      AuditLog[]
+
+  @@index([roleId])
+  @@map("users")
+}
+
+model Role {
+  id          String           @id
+  name        RoleName         @unique
+  description String?
+  createdAt   DateTime         @default(now())
+
+  users       User[]
+  permissions RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String           @id
+  scope       String           @unique
+  description String?
+  createdAt   DateTime         @default(now())
+
+  roles       RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ipAddress String?
+  userAgent String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([token])
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+// ─── CATALOGUE & STUDIOS ────────────────────────────────────────────────────
+
+model GameCategory {
+  id           String             @id
+  slug         String             @unique
+  name         String             @unique
+  description  String?
+  displayOrder Int                @default(0)
+  createdAt    DateTime           @default(now())
+
+  games        Game[]
+  librarySlots LibraryGameSlot[]
+
+  @@map("game_categories")
+}
+
+model DeveloperStudio {
+  id           String      @id
+  slug         String      @unique
+  name         String
+  tagline      String?
+  icon         String      @default("Sparkles")
+  genre        String
+  headquarters String
+  description  String
+  gamesCount   Int         @default(0)
+  partnerTier  PartnerTier @default(STUDIO_PARTNER)
+  website      String?
+  showInTicker Boolean     @default(true)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  games        Game[]
+
+  @@index([partnerTier])
+  @@map("developer_studios")
+}
+
+model Game {
+  id              String        @id
+  slug            String        @unique
+  projectCode     String        @unique
+  title           String
+  tagline         String
+  genre           String
+  categoryId      String
+  category        GameCategory  @relation(fields: [categoryId], references: [id])
+  studioId        String?
+  studio          DeveloperStudio? @relation(fields: [studioId], references: [id], onDelete: SetNull)
+  phase           String        @default("Concept")
+  statusBadge     String        @default("DEVELOPMENT")
+  accentColor     String        @default("#FF263D")
+  description     String
+  progressPercent Int           @default(0)
+  coverImage      String?
+  storageSize     String?
+  developerName   String?
+  price           String        @default("Free to Play")
+  isFeatured      Boolean       @default(false)
+  isCatalogue     Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  userLibraries   UserLibrary[]
+  downloadBuilds  DownloadBuild[]
+  downloadEvents  DownloadEvent[]
+  reviews         Review[]
+  ratings         Rating[]
+
+  @@index([categoryId])
+  @@index([studioId])
+  @@map("games")
+}
+
+model LibraryGameSlot {
+  id              String        @id
+  categoryId      String
+  category        GameCategory  @relation(fields: [categoryId], references: [id])
+  slotNumber      Int
+  title           String        @default("")
+  tagline         String        @default("")
+  description     String        @default("")
+  coverImage      String        @default("")
+  badge           String        @default("SLOT OPEN")
+  accentColor     String        @default("#FF263D")
+  progressPercent Int           @default(0)
+  developer       String        @default("")
+  isEmpty         Boolean       @default(true)
+  gameId          String?
+  updatedAt       DateTime      @updatedAt
+
+  @@index([categoryId, slotNumber])
+  @@map("library_game_slots")
+}
+
+// ─── USER LIBRARIES & ENGAGEMENT ────────────────────────────────────────────
+
+model UserLibrary {
+  id              String            @id @default(cuid())
+  userId          String
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gameId          String
+  game            Game              @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  acquiredAt      DateTime          @default(now())
+  playTimeMinutes Int               @default(0)
+  lastPlayedAt    DateTime?
+  status          LibraryItemStatus @default(IN_LIBRARY)
+
+  @@unique([userId, gameId])
+  @@index([userId])
+  @@index([gameId])
+  @@map("user_libraries")
+}
+
+model Review {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gameId          String
+  game            Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  title           String
+  content         String
+  ratingScore     Int      // 1 to 5
+  isVerifiedOwner Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([userId, gameId])
+  @@index([gameId])
+  @@map("reviews")
+}
+
+model Rating {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gameId      String
+  game        Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  ratingScore Int      // 1 to 5
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, gameId])
+  @@index([gameId])
+  @@map("ratings")
+}
+
+// ─── DOWNLOAD BUILDS & TELEMETRY ────────────────────────────────────────────
+
+model DownloadBuild {
+  id             String           @id @default(cuid())
+  gameId         String?
+  game           Game?            @relation(fields: [gameId], references: [id], onDelete: SetNull)
+  itemType       DownloadItemType @default(CLIENT)
+  itemId         String
+  platform       TargetPlatform
+  version        String
+  downloadUrl    String
+  checksumSha256 String?
+  fileSizeBytes  BigInt?
+  isPublic       Boolean          @default(true)
+  releasedAt     DateTime         @default(now())
+
+  @@index([platform, itemType])
+  @@map("download_builds")
+}
+
+model DownloadEvent {
+  id        String           @id @default(cuid())
+  itemType  DownloadItemType @default(CLIENT)
+  itemId    String
+  gameId    String?
+  game      Game?            @relation(fields: [gameId], references: [id], onDelete: SetNull)
+  platform  TargetPlatform
+  version   String?
+  userId    String?
+  user      User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+  ipHash    String?
+  timestamp DateTime         @default(now())
+
+  @@index([timestamp])
+  @@index([platform])
+  @@index([itemType])
+  @@map("download_events")
+}
+
+// ─── PROMOTIONS & ANNOUNCEMENTS ─────────────────────────────────────────────
+
+model Promotion {
+  id          String    @id @default(cuid())
+  title       String
+  tagline     String?
+  description String?
+  promoType   PromoType @default(SPOTLIGHT)
+  gameId      String?
+  bannerUrl   String?
+  targetUrl   String
+  startsAt    DateTime  @default(now())
+  endsAt      DateTime?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+
+  @@index([isActive])
+  @@map("promotions")
+}
+
+model Announcement {
+  id          String               @id @default(cuid())
+  title       String
+  message     String
+  priority    AnnouncementPriority @default(NORMAL)
+  category    AnnouncementCategory @default(UPDATE)
+  isActive    Boolean              @default(true)
+  authorId    String?
+  author      User?                @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  authorName  String               @default("kuronex_dev")
+  publishedAt DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  @@index([isActive, priority])
+  @@map("announcements")
+}
+
+// ─── AUDIT & SETTINGS ───────────────────────────────────────────────────────
+
+model AuditLog {
+  id            String        @id @default(cuid())
+  action        String
+  category      AuditCategory
+  actorId       String?
+  actor         User?         @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  actorUsername String
+  target        String
+  details       String
+  status        AuditStatus   @default(SUCCESS)
+  ipAddress     String?
+  timestamp     DateTime      @default(now())
+
+  @@index([timestamp])
+  @@index([category])
+  @@map("audit_logs")
+}
+
+model PlatformSetting {
+  key         String   @id
+  value       String
+  valueType   String   @default("string") // string, boolean, number, json
+  isPublic    Boolean  @default(false)
+  description String?
+  updatedAt   DateTime @updatedAt
+
+  @@map("platform_settings")
+}

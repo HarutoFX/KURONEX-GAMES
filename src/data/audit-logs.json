@@ -1,0 +1,82 @@
+[
+  {
+    "id": "log_1793535239489",
+    "action": "Deleted User Account",
+    "category": "USERS",
+    "actor": "kuronex_dev",
+    "target": "player_1793535239266",
+    "details": "Removed account permanently by kuronex_dev",
+    "timestamp": "2026-11-01T12:13:59.489Z",
+    "status": "SUCCESS"
+  },
+  {
+    "id": "log_1793535239468",
+    "action": "Created Announcement",
+    "category": "CMS",
+    "actor": "kuronex_dev",
+    "target": "Security Audit Verification Complete",
+    "details": "New announcement broadcasted: Security Audit Verification Complete",
+    "timestamp": "2026-11-01T12:13:59.468Z",
+    "status": "SUCCESS"
+  },
+  {
+    "id": "log_1793535239457",
+    "action": "Updated User Role",
+    "category": "USERS",
+    "actor": "kuronex_dev",
+    "target": "player_1793535239266",
+    "details": "Role changed to developer by kuronex_dev",
+    "timestamp": "2026-11-01T12:13:59.457Z",
+    "status": "SUCCESS"
+  },
+  {
+    "id": "log_1793534923896",
+    "action": "Updated Game Slot",
+    "category": "GAMES",
+    "actor": "test1",
+    "target": "act-02",
+    "details": "Slot act-02 in Action updated (isEmpty: true)",
+    "timestamp": "2026-11-01T12:08:43.896Z",
+    "status": "SUCCESS"
+  },
+  {
+    "id": "log_1793534919381",
+    "action": "Updated Game Slot",
+    "category": "GAMES",
+    "actor": "test1",
+    "target": "act-01",
+    "details": "Slot act-01 in Action updated (isEmpty: true)",
+    "timestamp": "2026-11-01T12:08:39.381Z",
+    "status": "SUCCESS"
+  },
+  {
+    "id": "log_1793533795401",
+    "action": "Deleted User Account",
+    "category": "USERS",
+    "actor": "kuronex_dev",
+    "target": "player_1793533795167",
+    "details": "Removed account permanently by kuronex_dev",
+    "timestamp": "2026-11-01T11:49:55.401Z",
+    "status": "SUCCESS"
+  },
+  {
+    "id": "log_1793533795383",
+    "action": "Created Announcement",
+    "category": "CMS",
+    "actor": "kuronex_dev",
+    "target": "Security Audit Verification Complete",
+    "details": "New announcement broadcasted: Security Audit Verification Complete",
+    "timestamp": "2026-11-01T11:49:55.383Z",
+    "status": "SUCCESS"
+  },
+  {
+    "id": "log_1793533795374",
+    "action": "Updated User Role",
+    "category": "USERS",
+    "actor": "kuronex_dev",
+    "target": "player_1793533795167",
+    "details": "Role changed to developer by kuronex_dev",
+    "timestamp": "2026-11-01T11:49:55.374Z",
+    "status": "SUCCESS"
+  }
+]

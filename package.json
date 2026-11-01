@@ -6,7 +6,12 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "node scripts/run-all-tests.js",
+    "test:unit": "node scripts/run-unit-tests.js",
+    "test:integration": "node scripts/run-integration-tests.js",
+    "test:e2e": "node scripts/run-e2e-tests.js"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",

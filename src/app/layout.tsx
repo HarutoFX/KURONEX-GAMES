@@ -9,6 +9,7 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 });
 
 import { AuthProvider } from "@/context/AuthContext";
+import { ToastProvider } from "@/components/ui/toast";
 
 export const metadata: Metadata = {
   title: "KURONEX GAMES — Build Your Own Library",
@@ -36,7 +37,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={plusJakartaSans.className}>
-      <body className="antialiased">
+      <body className="antialiased selection:bg-[#FF263D]/25 selection:text-white">
+        <a href="#main-content" className="skip-link">
+          Skip to main content
+        </a>
         {/*
           KuronexBackground is position:fixed, z-index:0, pointer-events:none.
           It sits behind all page content on every route.
@@ -48,7 +52,13 @@ export default function RootLayout({
           All pages must have a transparent (or semi-transparent) background
           so the global animated grid shows through.
         */}
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <ToastProvider>
+            <div id="main-content" className="relative z-10 min-h-screen flex flex-col justify-between">
+              {children}
+            </div>
+          </ToastProvider>
+        </AuthProvider>
       </body>
     </html>
   );
