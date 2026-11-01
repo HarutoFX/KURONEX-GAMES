@@ -75,3 +75,4 @@ export function PasswordStrength({ password }: PasswordStrengthProps) {
     </div>
   );
 }
+
