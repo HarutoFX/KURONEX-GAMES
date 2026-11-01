@@ -8,10 +8,26 @@ import {
   LEGACY_SESSION_COOKIE_NAME,
   SESSION_DURATION_MS,
 } from "@/lib/auth";
+import { checkRateLimit, getClientIp } from "@/lib/security/rate-limiter";
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    const clientIp = getClientIp(req);
+    const ipRateLimit = checkRateLimit(`register:ip:${clientIp}`, 50, 60 * 60 * 1000);
+    if (!ipRateLimit.allowed) {
+      return NextResponse.json(
+        {
+          error: "Too many registration attempts from this network. Please try again later.",
+          retryAfter: ipRateLimit.retryAfterSeconds,
+        },
+        {
+          status: 429,
+          headers: { "Retry-After": String(ipRateLimit.retryAfterSeconds) },
+        }
+      );
+    }
+
+    const body = await req.json().catch(() => ({}));
     const { username, email, password } = body;
 
     // 1. Validation
@@ -22,7 +38,30 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const trimmedUsername = username.trim();
+    if (trimmedUsername.length > 30) {
+      return NextResponse.json(
+        { error: "Gamertag cannot exceed 30 characters." },
+        { status: 400 }
+      );
+    }
+
+    if (!/^[a-zA-Z0-9_-]+$/.test(trimmedUsername)) {
+      return NextResponse.json(
+        { error: "Gamertag can only contain letters, numbers, underscores, and dashes." },
+        { status: 400 }
+      );
+    }
+
     if (!email || typeof email !== "string" || !email.includes("@")) {
+      return NextResponse.json(
+        { error: "Please enter a valid email address." },
+        { status: 400 }
+      );
+    }
+
+    const trimmedEmail = email.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
       return NextResponse.json(
         { error: "Please enter a valid email address." },
         { status: 400 }
@@ -37,14 +76,14 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Uniqueness Checks
-    if (findUserByEmail(email)) {
+    if (findUserByEmail(trimmedEmail)) {
       return NextResponse.json(
         { error: "An account with this email already exists." },
         { status: 409 }
       );
     }
 
-    if (findUserByUsername(username)) {
+    if (findUserByUsername(trimmedUsername)) {
       return NextResponse.json(
         { error: "This gamertag is already claimed. Please choose another." },
         { status: 409 }
@@ -52,8 +91,8 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Create User & Session
-    const user = createUser({ username, email, password });
-    const sessionToken = createSession(user.id);
+    const user = createUser({ username: trimmedUsername, email: trimmedEmail, password });
+    const sessionToken = createSession(user.id, req);
 
     // 4. Return user & set HTTP-only cookie
     const response = NextResponse.json(
@@ -65,7 +104,7 @@ export async function POST(req: NextRequest) {
       name: SESSION_COOKIE_NAME,
       value: sessionToken,
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: process.env.NODE_ENV === "production" || process.env.SECURE_COOKIES === "true",
       sameSite: "lax",
       maxAge: SESSION_DURATION_MS / 1000,
       path: "/",
@@ -75,7 +114,7 @@ export async function POST(req: NextRequest) {
       name: LEGACY_SESSION_COOKIE_NAME,
       value: "",
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: process.env.NODE_ENV === "production" || process.env.SECURE_COOKIES === "true",
       sameSite: "lax",
       maxAge: 0,
       path: "/",

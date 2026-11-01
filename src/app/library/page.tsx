@@ -25,7 +25,7 @@ export default function LibraryPage() {
   const [selectedGame, setSelectedGame] = useState<LibraryGameSlot | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const isAdmin = user?.role === "admin";
+  const isAdmin = user?.role?.toLowerCase() === "admin" || user?.role?.toLowerCase() === "super_admin";
 
   useEffect(() => {
     async function loadGames() {

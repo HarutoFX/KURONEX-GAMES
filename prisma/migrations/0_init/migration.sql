@@ -259,3 +259,4 @@ CREATE TABLE "platform_settings" (
     "description" TEXT,
     "updatedAt" TIMESTAMP(3) WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+

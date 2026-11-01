@@ -8,6 +8,7 @@ import {
 } from "@/lib/download-store";
 import { getSessionUser } from "@/lib/auth";
 import { parsePagination } from "@/lib/api/validators";
+import { checkRateLimit, getClientIp } from "@/lib/security/rate-limiter";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +57,21 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const clientIp = getClientIp(req);
+    const ipRateLimit = checkRateLimit(`downloads:post:${clientIp}`, 120, 60 * 1000);
+    if (!ipRateLimit.allowed) {
+      return NextResponse.json(
+        {
+          error: "Rate limit exceeded for download metrics telemetry.",
+          retryAfter: ipRateLimit.retryAfterSeconds,
+        },
+        {
+          status: 429,
+          headers: { "Retry-After": String(ipRateLimit.retryAfterSeconds) },
+        }
+      );
+    }
+
     const user = await getSessionUser(req);
     const body = await req.json().catch(() => ({}));
     const { itemType, itemId, platform, version } = body;
@@ -64,13 +80,17 @@ export async function POST(req: NextRequest) {
       platform === "windows" || platform === "macos" || platform === "linux" ? platform : "other";
 
     const validItemType = itemType === "game" ? "game" : "client";
-    const validItemId = typeof itemId === "string" && itemId.trim() ? itemId.trim() : "kuronex-launcher";
+    const rawItemId = typeof itemId === "string" && itemId.trim() ? itemId.trim() : "kuronex-launcher";
+    // Sanitize itemId against path traversal and control characters
+    const validItemId = rawItemId.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64) || "kuronex-launcher";
+    const validVersion =
+      typeof version === "string" ? version.trim().replace(/[^a-zA-Z0-9._-]/g, "").slice(0, 32) : undefined;
 
     const event = recordDownloadEvent({
       itemType: validItemType,
       itemId: validItemId,
       platform: validPlatform,
-      version: typeof version === "string" ? version : undefined,
+      version: validVersion,
       userId: user?.id,
     });
 

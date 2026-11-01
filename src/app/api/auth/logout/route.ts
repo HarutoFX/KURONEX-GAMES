@@ -1,17 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
-import { deleteSession, SESSION_COOKIE_NAME, LEGACY_SESSION_COOKIE_NAME } from "@/lib/auth";
+import {
+  deleteSession,
+  revokeAllUserSessions,
+  getSessionUser,
+  SESSION_COOKIE_NAME,
+  LEGACY_SESSION_COOKIE_NAME,
+} from "@/lib/auth";
 
 export async function POST(req: NextRequest) {
   try {
     const sessionToken =
       req.cookies.get(SESSION_COOKIE_NAME)?.value ||
       req.cookies.get(LEGACY_SESSION_COOKIE_NAME)?.value;
-    if (sessionToken) {
+
+    const url = new URL(req.url);
+    const body = await req.json().catch(() => ({}));
+    const revokeAll = url.searchParams.get("all") === "true" || body.all === true;
+
+    if (revokeAll) {
+      const user = await getSessionUser(req);
+      if (user) {
+        revokeAllUserSessions(user.id);
+      }
+    } else if (sessionToken) {
       deleteSession(sessionToken);
     }
 
     const response = NextResponse.json(
-      { message: "Logged out successfully" },
+      { message: revokeAll ? "All sessions revoked successfully" : "Logged out successfully" },
       { status: 200 }
     );
 
@@ -19,7 +35,7 @@ export async function POST(req: NextRequest) {
       name: SESSION_COOKIE_NAME,
       value: "",
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: process.env.NODE_ENV === "production" || process.env.SECURE_COOKIES === "true",
       sameSite: "lax",
       maxAge: 0,
       path: "/",
@@ -29,7 +45,7 @@ export async function POST(req: NextRequest) {
       name: LEGACY_SESSION_COOKIE_NAME,
       value: "",
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: process.env.NODE_ENV === "production" || process.env.SECURE_COOKIES === "true",
       sameSite: "lax",
       maxAge: 0,
       path: "/",

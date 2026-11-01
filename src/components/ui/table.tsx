@@ -73,3 +73,4 @@ export function TableCaption({ className, children, ...props }: React.HTMLAttrib
     </caption>
   );
 }
+

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin, getActiveSessionCount, getGameLibraryStats } from "@/lib/auth";
+import { requireAdmin, requirePermission, getActiveSessionCount, getGameLibraryStats } from "@/lib/auth";
 import { getTotalDownloadCount, getPlatformDownloadStats } from "@/lib/download-store";
 import {
   getAuditLogs,
@@ -92,6 +92,11 @@ export async function POST(req: NextRequest) {
     const { action } = body;
 
     if (action === "updateSettings") {
+      const permCheck = await requirePermission("system:settings:write", req);
+      if (!permCheck.authorized) {
+        return NextResponse.json({ error: permCheck.error }, { status: permCheck.status });
+      }
+
       const incoming = body.settings;
       if (!incoming || typeof incoming !== "object") {
         return NextResponse.json({ error: "Invalid settings payload" }, { status: 400 });
@@ -110,6 +115,11 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "createAnnouncement") {
+      const permCheck = await requirePermission("announcements:write", req);
+      if (!permCheck.authorized) {
+        return NextResponse.json({ error: permCheck.error }, { status: permCheck.status });
+      }
+
       const ann = body.announcement;
       if (!ann || typeof ann !== "object") {
         return NextResponse.json({ error: "Invalid announcement payload" }, { status: 400 });
@@ -148,6 +158,11 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "toggleAnnouncement") {
+      const permCheck = await requirePermission("announcements:write", req);
+      if (!permCheck.authorized) {
+        return NextResponse.json({ error: permCheck.error }, { status: permCheck.status });
+      }
+
       if (!body.id || typeof body.id !== "string") {
         return NextResponse.json({ error: "Announcement ID required" }, { status: 400 });
       }
@@ -162,6 +177,11 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === "deleteAnnouncement") {
+      const permCheck = await requirePermission("announcements:write", req);
+      if (!permCheck.authorized) {
+        return NextResponse.json({ error: permCheck.error }, { status: permCheck.status });
+      }
+
       if (!body.id || typeof body.id !== "string") {
         return NextResponse.json({ error: "Announcement ID required" }, { status: 400 });
       }

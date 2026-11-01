@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDevelopers, saveDevelopers, updateDeveloper, DeveloperPartner } from "@/lib/library-store";
-import { requireAdmin } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import { logAdminAction } from "@/lib/admin-store";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
-    const auth = await requireAdmin(req);
+    const auth = await requirePermission("developers:read", req);
     if (!auth.authorized) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const auth = await requireAdmin(req);
+    const auth = await requirePermission("developers:write", req);
     if (!auth.authorized) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/auth";
+import { requirePermission } from "@/lib/auth";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
@@ -16,7 +16,7 @@ export interface ServiceHealth {
 
 export async function GET(req: NextRequest) {
   try {
-    const auth = await requireAdmin(req);
+    const auth = await requirePermission("system:audit:read", req);
     if (!auth.authorized) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }

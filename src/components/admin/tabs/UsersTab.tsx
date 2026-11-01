@@ -8,14 +8,14 @@ export interface AdminUserItem {
   username: string;
   email: string;
   createdAt: string;
-  role: "player" | "developer" | "admin";
+  role: string;
 }
 
 interface UsersTabProps {
   mode?: "users" | "team" | "roles";
   filteredUsers: AdminUserItem[];
   currentUser: { id: string; username: string; email?: string; role?: string } | null;
-  onUpdateRole: (userId: string, newRole: "player" | "developer" | "admin") => void;
+  onUpdateRole: (userId: string, newRole: string) => void;
   onDeleteUser: (userId: string) => void;
 }
 
@@ -128,22 +128,27 @@ export function UsersTab({
                 </td>
                 <td className="py-3 px-4">
                   <select
-                    value={u.role}
+                    value={u.role.toLowerCase()}
                     disabled={u.id === "kuro_dev_admin_root" || u.id === currentUser?.id}
-                    onChange={(e) =>
-                      onUpdateRole(u.id, e.target.value as "player" | "developer" | "admin")
-                    }
+                    onChange={(e) => onUpdateRole(u.id, e.target.value)}
                     className={`rounded-lg border border-[#35151C] bg-[#1A0D10] px-2 py-1 text-xs font-mono font-bold outline-none cursor-pointer ${
-                      u.role === "admin"
+                      u.role === "admin" || u.role === "super_admin"
                         ? "text-[#FF263D] border-[#FF263D]/40"
                         : u.role === "developer"
                         ? "text-[#00E5FF] border-[#00E5FF]/40"
+                        : u.role === "moderator"
+                        ? "text-amber-400 border-amber-400/40"
                         : "text-[#A1A1AA]"
                     } disabled:opacity-50`}
                   >
                     <option value="player">player</option>
                     <option value="developer">developer</option>
+                    <option value="analyst">analyst</option>
+                    <option value="content_manager">content_manager</option>
+                    <option value="game_manager">game_manager</option>
+                    <option value="moderator">moderator</option>
                     <option value="admin">admin</option>
+                    <option value="super_admin">super_admin</option>
                   </select>
                 </td>
                 <td className="py-3 px-4 text-right">

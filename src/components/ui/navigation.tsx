@@ -89,7 +89,7 @@ export function SiteNavbar({
       return false;
     })?.name;
 
-  const isAdmin = user?.role === "admin";
+  const isAdmin = user?.role?.toLowerCase() === "admin" || user?.role?.toLowerCase() === "super_admin";
 
   return (
     <Navbar>
@@ -250,3 +250,4 @@ export function SiteFooter() {
     </footer>
   );
 }
+

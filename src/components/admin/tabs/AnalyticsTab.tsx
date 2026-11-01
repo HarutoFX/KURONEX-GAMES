@@ -116,3 +116,4 @@ export function AnalyticsTab({ games, metrics }: AnalyticsTabProps) {
     </div>
   );
 }
+

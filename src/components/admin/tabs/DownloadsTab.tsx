@@ -38,3 +38,4 @@ export function DownloadsTab({ settings }: DownloadsTabProps) {
     </div>
   );
 }
+

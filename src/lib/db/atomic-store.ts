@@ -42,3 +42,4 @@ export function safeReadJsonSync<T>(filePath: string, fallback: T): T {
     return fallback;
   }
 }
+

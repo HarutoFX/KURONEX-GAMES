@@ -4,6 +4,8 @@ import crypto from "crypto";
 import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
 import { atomicWriteJsonSync } from "./db/atomic-store";
+import { isAdminRole, hasPermission, Permission, normalizeRole } from "./security/rbac";
+import { getClientIp } from "./security/rate-limiter";
 
 export interface User {
   id: string;
@@ -12,8 +14,13 @@ export interface User {
   passwordHash: string;
   salt: string;
   createdAt: string;
-  role: "player" | "developer" | "admin";
+  role: string;
   library?: string[];
+  isSuspended?: boolean;
+  suspendedReason?: string;
+  isEmailVerified?: boolean;
+  passwordResetTokenHash?: string;
+  passwordResetExpiresAt?: number;
 }
 
 export interface SafeUser {
@@ -21,14 +28,19 @@ export interface SafeUser {
   username: string;
   email: string;
   createdAt: string;
-  role: "player" | "developer" | "admin";
+  role: string;
   library: string[];
+  isSuspended?: boolean;
+  isEmailVerified?: boolean;
 }
 
 export interface Session {
   token: string;
   userId: string;
   expiresAt: number;
+  createdAt: number;
+  ipAddress?: string;
+  userAgent?: string;
 }
 
 const DB_FILE = path.join(process.cwd(), "src", "data", "users.json");
@@ -146,6 +158,8 @@ export function toSafeUser(user: User): SafeUser {
     createdAt: user.createdAt,
     role: user.role,
     library: Array.isArray(user.library) ? user.library : [],
+    isSuspended: Boolean(user.isSuspended),
+    isEmailVerified: Boolean(user.isEmailVerified),
   };
 }
 
@@ -187,6 +201,73 @@ export function createUser(data: { username: string; email: string; password: st
 export function getUserLibrary(userId: string): string[] {
   const user = findUserById(userId);
   return Array.isArray(user?.library) ? user.library : [];
+}
+
+export function suspendUser(userId: string, suspended: boolean, reason = ""): boolean {
+  const users = readUsers();
+  const user = users.find((u) => u.id === userId);
+  if (!user) return false;
+
+  user.isSuspended = suspended;
+  user.suspendedReason = suspended ? reason : undefined;
+  writeUsers(users);
+
+  // If suspending, immediately invalidate all active sessions for this user
+  if (suspended) {
+    revokeAllUserSessions(userId);
+  }
+
+  return true;
+}
+
+export function setPasswordResetToken(userId: string, tokenHash: string, expiresAt: number): boolean {
+  const users = readUsers();
+  const user = users.find((u) => u.id === userId);
+  if (!user) return false;
+
+  user.passwordResetTokenHash = tokenHash;
+  user.passwordResetExpiresAt = expiresAt;
+  writeUsers(users);
+  return true;
+}
+
+export function clearPasswordResetToken(userId: string): boolean {
+  const users = readUsers();
+  const user = users.find((u) => u.id === userId);
+  if (!user) return false;
+
+  user.passwordResetTokenHash = undefined;
+  user.passwordResetExpiresAt = undefined;
+  writeUsers(users);
+  return true;
+}
+
+export function findUserByResetTokenHash(tokenHash: string): User | undefined {
+  const users = readUsers();
+  const now = Date.now();
+  return users.find(
+    (u) =>
+      u.passwordResetTokenHash === tokenHash &&
+      u.passwordResetExpiresAt !== undefined &&
+      u.passwordResetExpiresAt > now
+  );
+}
+
+export function updateUserPassword(userId: string, newPassword: string): boolean {
+  const users = readUsers();
+  const user = users.find((u) => u.id === userId);
+  if (!user) return false;
+
+  const { hash, salt } = hashPassword(newPassword);
+  user.passwordHash = hash;
+  user.salt = salt;
+  user.passwordResetTokenHash = undefined;
+  user.passwordResetExpiresAt = undefined;
+  writeUsers(users);
+
+  // Revoke all existing sessions to prevent session hijacking
+  revokeAllUserSessions(userId);
+  return true;
 }
 
 export function updateUserLibrary(
@@ -235,27 +316,56 @@ export function getGameLibraryStats(): Record<string, number> {
 }
 
 // ─── Session Management ─────────────────────────────────────────────────────
-export function createSession(userId: string): string {
+export function createSession(userId: string, req?: NextRequest): string {
   const sessions = readSessions();
-  // Clear any existing expired sessions
   const now = Date.now();
   const validSessions = sessions.filter((s) => s.expiresAt > now);
 
   const token = crypto.randomBytes(32).toString("hex");
+  const ipAddress = req ? getClientIp(req) : undefined;
+  const userAgent = req?.headers.get("user-agent") || undefined;
+
   validSessions.push({
     token,
     userId,
     expiresAt: now + SESSION_DURATION_MS,
+    createdAt: now,
+    ipAddress,
+    userAgent,
   });
 
   writeSessions(validSessions);
   return token;
 }
 
-export function deleteSession(token: string) {
+export function rotateSession(oldToken: string, userId: string, req?: NextRequest): string {
+  deleteSession(oldToken);
+  return createSession(userId, req);
+}
+
+export function deleteSession(token: string): boolean {
   const sessions = readSessions();
+  const initialCount = sessions.length;
   const filtered = sessions.filter((s) => s.token !== token);
-  writeSessions(filtered);
+  if (filtered.length !== initialCount) {
+    writeSessions(filtered);
+    return true;
+  }
+  return false;
+}
+
+export function revokeAllUserSessions(userId: string): number {
+  const sessions = readSessions();
+  const remaining = sessions.filter((s) => s.userId !== userId);
+  const revokedCount = sessions.length - remaining.length;
+  writeSessions(remaining);
+  return revokedCount;
+}
+
+export function getUserSessions(userId: string): Session[] {
+  const sessions = readSessions();
+  const now = Date.now();
+  return sessions.filter((s) => s.userId === userId && s.expiresAt > now);
 }
 
 export async function getSessionUser(req?: NextRequest): Promise<SafeUser | null> {
@@ -294,6 +404,12 @@ export async function getSessionUser(req?: NextRequest): Promise<SafeUser | null
   const user = findUserById(session.userId);
   if (!user) return null;
 
+  // Immediate session revocation for suspended accounts
+  if (user.isSuspended) {
+    deleteSession(sessionToken);
+    return null;
+  }
+
   return toSafeUser(user);
 }
 
@@ -301,11 +417,13 @@ export async function getCurrentUser(): Promise<SafeUser | null> {
   return getSessionUser();
 }
 
-export type RequireAdminResult =
+export type RequireAuthResult =
   | { authorized: true; user: SafeUser }
   | { authorized: false; error: string; status: number };
 
-export async function requireAdmin(req?: NextRequest): Promise<RequireAdminResult> {
+export type RequireAdminResult = RequireAuthResult;
+
+export async function requireAdmin(req?: NextRequest): Promise<RequireAuthResult> {
   const user = await getSessionUser(req);
 
   if (!user) {
@@ -316,10 +434,63 @@ export async function requireAdmin(req?: NextRequest): Promise<RequireAdminResul
     };
   }
 
-  if (user.role !== "admin") {
+  if (!isAdminRole(user.role)) {
     return {
       authorized: false,
       error: "Forbidden. Administrative privileges required.",
+      status: 403,
+    };
+  }
+
+  return {
+    authorized: true,
+    user,
+  };
+}
+
+export async function requirePermission(permission: Permission, req?: NextRequest): Promise<RequireAuthResult> {
+  const user = await getSessionUser(req);
+
+  if (!user) {
+    return {
+      authorized: false,
+      error: "Authentication required. Please sign in to access this resource.",
+      status: 401,
+    };
+  }
+
+  if (!hasPermission(user.role, permission)) {
+    return {
+      authorized: false,
+      error: `Forbidden. Missing required permission: '${permission}'.`,
+      status: 403,
+    };
+  }
+
+  return {
+    authorized: true,
+    user,
+  };
+}
+
+export async function requireRole(allowedRoles: string[], req?: NextRequest): Promise<RequireAuthResult> {
+  const user = await getSessionUser(req);
+
+  if (!user) {
+    return {
+      authorized: false,
+      error: "Authentication required. Please sign in to continue.",
+      status: 401,
+    };
+  }
+
+  const userRole = normalizeRole(user.role);
+  const normalizedAllowed = allowedRoles.map((r) => normalizeRole(r));
+
+  if (!normalizedAllowed.includes(userRole) && userRole !== "SUPER_ADMIN") {
+    return {
+      authorized: false,
+      error: "Forbidden. Your role is not authorized for this operation.",
       status: 403,
     };
   }

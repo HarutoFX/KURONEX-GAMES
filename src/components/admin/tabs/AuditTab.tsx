@@ -55,3 +55,4 @@ export function AuditTab({ filteredLogs }: AuditTabProps) {
     </div>
   );
 }
+

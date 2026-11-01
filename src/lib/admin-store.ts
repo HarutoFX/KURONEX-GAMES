@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import { User, SafeUser, toSafeUser } from "./auth";
+import { User, SafeUser, toSafeUser, revokeAllUserSessions } from "./auth";
 import { atomicWriteJsonSync } from "./db/atomic-store";
 
 export interface AuditLog {
@@ -237,7 +237,7 @@ export function getAllUsers(): SafeUser[] {
   }
 }
 
-export function updateUserRole(userId: string, newRole: "player" | "developer" | "admin", actor = "system"): boolean {
+export function updateUserRole(userId: string, newRole: string, actor = "system"): boolean {
   try {
     ensureFile(USERS_FILE, "[]");
     const data = fs.readFileSync(USERS_FILE, "utf-8");
@@ -246,7 +246,7 @@ export function updateUserRole(userId: string, newRole: "player" | "developer" |
     if (!target) return false;
 
     // Prevent demoting root admin if it's the only one
-    if (target.id === "kuro_dev_admin_root" && newRole !== "admin") {
+    if (target.id === "kuro_dev_admin_root" && newRole !== "admin" && newRole !== "SUPER_ADMIN") {
       return false;
     }
 
@@ -256,6 +256,39 @@ export function updateUserRole(userId: string, newRole: "player" | "developer" |
     return true;
   } catch (error) {
     console.error("Failed to update user role:", error);
+    return false;
+  }
+}
+
+export function suspendUserAccount(userId: string, suspended: boolean, reason = "", actor = "system"): boolean {
+  try {
+    if (userId === "kuro_dev_admin_root") return false; // Protected root admin cannot be suspended
+
+    ensureFile(USERS_FILE, "[]");
+    const data = fs.readFileSync(USERS_FILE, "utf-8");
+    const users: User[] = JSON.parse(data || "[]");
+    const target = users.find((u) => u.id === userId);
+    if (!target) return false;
+
+    target.isSuspended = suspended;
+    target.suspendedReason = suspended ? reason : undefined;
+    atomicWriteJsonSync(USERS_FILE, users);
+
+    // Invalidate all active sessions immediately upon suspension
+    if (suspended) {
+      revokeAllUserSessions(userId);
+    }
+
+    logAdminAction(
+      suspended ? "Suspended User Account" : "Reactivated User Account",
+      "USERS",
+      target.username,
+      suspended ? `Account suspended (${reason || "Policy violation"}) by ${actor}` : `Account reactivated by ${actor}`,
+      actor
+    );
+    return true;
+  } catch (error) {
+    console.error("Failed to suspend user account:", error);
     return false;
   }
 }

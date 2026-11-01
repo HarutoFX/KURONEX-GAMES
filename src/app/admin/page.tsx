@@ -35,7 +35,7 @@ export default function AdminPage() {
   const router = useRouter();
   const { user, isLoading, logout } = useAuth();
 
-  const isAuthenticated = !isLoading && user?.role === "admin";
+  const isAuthenticated = !isLoading && (user?.role?.toLowerCase() === "admin" || user?.role?.toLowerCase() === "super_admin");
 
   // Navigation & Layout
   const [currentTab, setCurrentTab] = useState<AdminTab>("dashboard");
@@ -277,7 +277,7 @@ export default function AdminPage() {
     }
   };
 
-  const handleUpdateRole = async (userId: string, newRole: "player" | "developer" | "admin") => {
+  const handleUpdateRole = async (userId: string, newRole: string) => {
     setIsSaving(true);
     try {
       const res = await fetch("/api/admin/users", {
