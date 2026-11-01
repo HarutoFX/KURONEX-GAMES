@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Shield,
-  KeyRound,
   Plus,
   Trash2,
   Edit3,
@@ -36,27 +36,10 @@ import { TopGamesTable } from "@/components/admin/TopGamesTable";
 const CATEGORIES = ["Action", "RPG", "Sci-Fi", "Strategy", "Survival", "Shooter"] as const;
 
 export default function AdminPage() {
-  const { user } = useAuth();
+  const router = useRouter();
+  const { user, isLoading, logout } = useAuth();
 
-  // Authentication & Passkey State
-  const [adminKey, setAdminKey] = useState<string>("kuronex-admin-2026");
-  const [sessionAuthed, setSessionAuthed] = useState<boolean>(false);
-
-  // Read stored passkey on client mount
-  useEffect(() => {
-    try {
-      const stored = sessionStorage.getItem("kuronex_admin_passkey");
-      if (stored === "kuronex-admin-2026") {
-        queueMicrotask(() => {
-          setSessionAuthed(true);
-        });
-      }
-    } catch {
-      // ignore
-    }
-  }, []);
-
-  const isAuthenticated = sessionAuthed || user?.role === "admin";
+  const isAuthenticated = !isLoading && user?.role === "admin";
 
   // Navigation & Layout
   const [currentTab, setCurrentTab] = useState<AdminTab>("dashboard");
@@ -78,7 +61,7 @@ export default function AdminPage() {
     clientVersion: "v1.4.2",
     clientDownloadUrl: "/download",
     supportEmail: "support@kuronex.com",
-    adminPasskey: "kuronex-admin-2026",
+    sessionTimeoutDays: 30,
     maxUploadSizeMb: 120,
     featuredCategory: "Action",
   });
@@ -102,7 +85,7 @@ export default function AdminPage() {
     priority: "NORMAL" as Announcement["priority"],
     category: "UPDATE" as Announcement["category"],
     isActive: true,
-    author: user?.username || "kuronex_dev",
+    author: user?.username || "admin",
   });
   const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
 
@@ -130,12 +113,11 @@ export default function AdminPage() {
   // Fetch all live data when authenticated
   const loadAllData = useCallback(async () => {
     try {
-      const headers = { "x-admin-key": adminKey };
       const [gRes, dRes, uRes, sRes] = await Promise.all([
-        fetch("/api/admin/games", { headers }),
-        fetch("/api/admin/developers", { headers }),
-        fetch("/api/admin/users", { headers }),
-        fetch("/api/admin/system", { headers }),
+        fetch("/api/admin/games"),
+        fetch("/api/admin/developers"),
+        fetch("/api/admin/users"),
+        fetch("/api/admin/system"),
       ]);
 
       if (gRes.ok) {
@@ -159,7 +141,7 @@ export default function AdminPage() {
     } catch (err) {
       console.error("Failed to load admin data:", err);
     }
-  }, [adminKey]);
+  }, []);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -169,30 +151,13 @@ export default function AdminPage() {
     }
   }, [isAuthenticated, loadAllData]);
 
-  // Passkey Login Handler
-  const handleKeyAuth = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (adminKey.trim() === "kuronex-admin-2026" || user?.role === "admin") {
-      setSessionAuthed(true);
-      try {
-        sessionStorage.setItem("kuronex_admin_passkey", adminKey.trim());
-      } catch {
-        // ignore
-      }
-      showToast("Admin session authenticated.");
-    } else {
-      showToast("Invalid admin passkey. Please verify and retry.", "error");
-    }
-  };
-
-  const handleLockSession = () => {
-    setSessionAuthed(false);
+  const handleSignOut = async () => {
     try {
-      sessionStorage.removeItem("kuronex_admin_passkey");
+      await logout();
+      router.push("/login");
     } catch {
-      // ignore
+      showToast("Error during sign out", "error");
     }
-    showToast("Admin session locked.");
   };
 
   // ─── ACTION HANDLERS ────────────────────────────────────────────────────────
@@ -213,7 +178,6 @@ export default function AdminPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-key": adminKey,
         },
         body: JSON.stringify({ slot: updatedSlot }),
       });
@@ -256,7 +220,6 @@ export default function AdminPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-key": adminKey,
         },
         body: JSON.stringify({ slot: clearedSlot }),
       });
@@ -285,7 +248,6 @@ export default function AdminPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-key": adminKey,
         },
         body: JSON.stringify({ developer: editingDev }),
       });
@@ -323,7 +285,6 @@ export default function AdminPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-key": adminKey,
         },
         body: JSON.stringify({ developers: remaining }),
       });
@@ -349,7 +310,6 @@ export default function AdminPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-key": adminKey,
         },
         body: JSON.stringify({ action: "updateRole", userId, role: newRole }),
       });
@@ -376,7 +336,6 @@ export default function AdminPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-key": adminKey,
         },
         body: JSON.stringify({ action: "deleteUser", userId }),
       });
@@ -404,7 +363,6 @@ export default function AdminPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-key": adminKey,
         },
         body: JSON.stringify({ action: "createAnnouncement", announcement: newAnnouncement }),
       });
@@ -436,7 +394,6 @@ export default function AdminPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-key": adminKey,
         },
         body: JSON.stringify({ action: "toggleAnnouncement", id }),
       });
@@ -457,7 +414,6 @@ export default function AdminPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-key": adminKey,
         },
         body: JSON.stringify({ action: "deleteAnnouncement", id }),
       });
@@ -479,7 +435,6 @@ export default function AdminPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-admin-key": adminKey,
         },
         body: JSON.stringify({ action: "updateSettings", settings }),
       });
@@ -494,62 +449,64 @@ export default function AdminPage() {
     }
   };
 
-  // ─── GATE: UN-AUTHENTICATED ─────────────────────────────────────────────────
+  // ─── GATE: SESSION LOADING ──────────────────────────────────────────────────
+  if (isLoading) {
+    return (
+      <main className="relative min-h-screen w-full flex flex-col justify-center items-center px-4 py-16 bg-[#080808] text-[#FFFFFF] antialiased">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#FF263D] border-t-transparent shadow-[0_0_20px_rgba(255,38,61,0.35)]" />
+          <p className="text-xs font-mono uppercase tracking-widest text-[#A1A1AA]">
+            Verifying Administrator Credentials...
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  // ─── GATE: UN-AUTHORIZED ACCESS RESTRICTED ──────────────────────────────────
   if (!isAuthenticated) {
     return (
       <main className="relative min-h-screen w-full flex flex-col justify-center items-center px-4 py-16 bg-[#080808] text-[#FFFFFF] antialiased">
         <div className="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-[#35151C] bg-[#100607] p-8 shadow-[0_20px_60px_rgba(0,0,0,0.85)]">
           <div className="text-center mb-6">
-            <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl border border-[#FF263D]/40 bg-[#1A0D10] text-[#FF263D] mb-4 shadow-[0_0_20px_rgba(255,38,61,0.25)]">
-              <Shield className="h-6 w-6" />
+            <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl border border-[#FF263D]/40 bg-[#1A0D10] text-[#FF263D] mb-4 shadow-[0_0_24px_rgba(255,38,61,0.25)]">
+              <Shield className="h-7 w-7" />
             </div>
             <h1 className="text-xl font-bold text-white tracking-wide">
-              KURONEX CONTROL CENTER
+              ADMINISTRATOR RESTRICTED
             </h1>
-            <p className="mt-1 text-xs text-[#A1A1AA]">
-              Enterprise-grade administration console. Enter passkey or log in as a platform curator.
+            <p className="mt-2 text-xs text-[#A1A1AA] leading-relaxed">
+              This terminal is strictly restricted to verified platform administrators.
             </p>
+            {user ? (
+              <div className="mt-4 rounded-xl border border-amber-500/20 bg-amber-500/10 p-3 text-left">
+                <div className="text-[11px] font-mono font-semibold text-amber-400">
+                  Active Session: @{user.username}
+                </div>
+                <div className="text-[10px] text-amber-200/80 mt-0.5">
+                  Role: <span className="font-mono uppercase font-bold">{user.role}</span> (Insufficient Permissions)
+                </div>
+              </div>
+            ) : (
+              <p className="mt-2 text-[11px] text-[#A1A1AA]/80">
+                No active session detected. Please authenticate with administrator credentials.
+              </p>
+            )}
           </div>
 
-          <form onSubmit={handleKeyAuth} className="space-y-4">
-            <div>
-              <label className="block text-[11px] font-mono uppercase tracking-wider text-[#A1A1AA] mb-1.5">
-                Admin Passkey
-              </label>
-              <div className="relative flex items-center">
-                <KeyRound className="absolute left-3.5 h-4 w-4 text-[#A1A1AA]" />
-                <input
-                  type="password"
-                  required
-                  value={adminKey}
-                  onChange={(e) => setAdminKey(e.target.value)}
-                  placeholder="Enter admin passkey..."
-                  className="w-full rounded-xl border border-[#35151C] bg-[#130A0C] py-2.5 pl-10 pr-4 text-xs sm:text-sm text-[#FFFFFF] placeholder-[#A1A1AA]/50 outline-none transition focus:border-[#FF263D] focus:ring-1 focus:ring-[#FF263D]/40"
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              className="w-full rounded-xl bg-[#FF263D] hover:bg-[#FF4054] active:bg-[#D91B30] py-3 text-xs font-bold text-white shadow-[0_4px_20px_rgba(255,38,61,0.35)] transition-all cursor-pointer"
-            >
-              Access Control Center
-            </button>
-          </form>
-
-          <div className="mt-6 flex items-center justify-between border-t border-[#35151C] pt-4 text-xs text-[#A1A1AA]">
+          <div className="space-y-3">
             <Link
-              href="/"
-              className="inline-flex items-center gap-1.5 hover:text-white transition"
+              href="/login?redirect=/admin"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#FF263D] hover:bg-[#FF4054] active:bg-[#D91B30] py-3 text-xs font-bold text-white shadow-[0_4px_20px_rgba(255,38,61,0.35)] transition-all cursor-pointer"
             >
-              <ArrowLeft className="h-3.5 w-3.5" />
-              <span>Back to Home</span>
+              Sign In as Administrator
             </Link>
             <Link
-              href="/login"
-              className="text-[#FF263D] hover:underline"
+              href="/"
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#35151C] bg-[#130A0C] hover:bg-[#1A0D10] py-2.5 text-xs font-medium text-[#A1A1AA] hover:text-white transition"
             >
-              Sign in with Account
+              <ArrowLeft className="h-3.5 w-3.5" />
+              <span>Return to Public Platform</span>
             </Link>
           </div>
         </div>
@@ -719,7 +676,7 @@ export default function AdminPage() {
       case "settings":
         return {
           title: "Platform Configuration",
-          subtitle: "Global runtime flags, maintenance mode, client URLs, and passkeys.",
+          subtitle: "Global runtime flags, maintenance mode, client URLs, and session security.",
         };
       default:
         return {
@@ -762,8 +719,8 @@ export default function AdminPage() {
         }}
         collapsed={collapsed}
         onToggleCollapse={() => setCollapsed(!collapsed)}
-        adminUsername={user?.username || "kuronex_dev"}
-        onLockSession={handleLockSession}
+        adminUsername={user?.username || "Admin"}
+        onLockSession={handleSignOut}
         mobileOpen={mobileOpen}
         onCloseMobile={() => setMobileOpen(false)}
       />
@@ -1034,7 +991,7 @@ export default function AdminPage() {
                           <td className="py-3 px-4">
                             <select
                               value={u.role}
-                              disabled={u.id === "kuro_dev_admin_root"}
+                              disabled={u.id === "kuro_dev_admin_root" || u.id === user?.id}
                               onChange={(e) =>
                                 handleUpdateRole(u.id, e.target.value as "player" | "developer" | "admin")
                               }
@@ -1052,7 +1009,15 @@ export default function AdminPage() {
                             </select>
                           </td>
                           <td className="py-3 px-4 text-right">
-                            {u.id !== "kuro_dev_admin_root" ? (
+                            {u.id === "kuro_dev_admin_root" ? (
+                              <span className="text-[10px] font-mono text-emerald-400 font-bold uppercase">
+                                Root Secured
+                              </span>
+                            ) : u.id === user?.id ? (
+                              <span className="text-[10px] font-mono text-amber-400 font-semibold uppercase">
+                                Active User
+                              </span>
+                            ) : (
                               <button
                                 onClick={() => handleDeleteUser(u.id)}
                                 className="inline-flex items-center gap-1 rounded-lg border border-red-500/20 bg-red-500/10 px-2.5 py-1 text-xs font-semibold text-red-400 hover:bg-red-500/20 transition cursor-pointer"
@@ -1060,10 +1025,6 @@ export default function AdminPage() {
                                 <Trash2 className="h-3 w-3" />
                                 <span>Delete</span>
                               </button>
-                            ) : (
-                              <span className="text-[10px] font-mono text-emerald-400 font-bold uppercase">
-                                Root Secured
-                              </span>
                             )}
                           </td>
                         </tr>
@@ -1744,7 +1705,7 @@ export default function AdminPage() {
                         { scope: "Configure 3D Cartridge Slots", player: false, dev: false, curator: true, admin: true },
                         { scope: "Broadcast Announcements", player: false, dev: false, curator: true, admin: true },
                         { scope: "Manage User Roles & Delete Accounts", player: false, dev: false, curator: false, admin: true },
-                        { scope: "Modify Platform Passkeys & Core Config", player: false, dev: false, curator: false, admin: true },
+                        { scope: "Modify Platform Architecture & Core Config", player: false, dev: false, curator: false, admin: true },
                       ].map((perm, idx) => (
                         <tr key={idx} className="hover:bg-[#1A0D10]/60">
                           <td className="py-3 px-4 font-semibold text-white">{perm.scope}</td>
@@ -1855,12 +1816,14 @@ export default function AdminPage() {
 
                     <div>
                       <label className="block text-xs font-semibold text-[#A1A1AA] mb-1">
-                        Emergency Passkey
+                        Session Timeout (Days)
                       </label>
                       <input
-                        type="password"
-                        value={settings.adminPasskey}
-                        onChange={(e) => setSettings({ ...settings, adminPasskey: e.target.value })}
+                        type="number"
+                        min={1}
+                        max={90}
+                        value={settings.sessionTimeoutDays || 30}
+                        onChange={(e) => setSettings({ ...settings, sessionTimeoutDays: parseInt(e.target.value, 10) || 30 })}
                         className="w-full rounded-xl border border-[#35151C] bg-[#1A0D10] p-2.5 text-xs text-white outline-none focus:border-[#FF263D]"
                       />
                     </div>

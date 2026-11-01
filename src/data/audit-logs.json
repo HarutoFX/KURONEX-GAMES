@@ -1,22 +1,42 @@
 [
   {
-    "id": "log_01",
-    "action": "System Initialization",
-    "category": "SYSTEM",
+    "id": "log_1793533795401",
+    "action": "Deleted User Account",
+    "category": "USERS",
     "actor": "kuronex_dev",
-    "target": "Kuronex Core Engine",
-    "details": "Platform control system booted with encrypted session management.",
-    "timestamp": "2026-10-31T11:23:06.755Z",
+    "target": "player_1793533795167",
+    "details": "Removed account permanently by kuronex_dev",
+    "timestamp": "2026-11-01T11:49:55.401Z",
     "status": "SUCCESS"
   },
   {
-    "id": "log_02",
-    "action": "Catalog Sync",
-    "category": "GAMES",
+    "id": "log_1793533795383",
+    "action": "Created Announcement",
+    "category": "CMS",
     "actor": "kuronex_dev",
-    "target": "KX-01 Neon Haven",
-    "details": "Updated cartridge asset pipeline and live server cluster status.",
-    "timestamp": "2026-10-31T23:23:06.755Z",
+    "target": "Security Audit Verification Complete",
+    "details": "New announcement broadcasted: Security Audit Verification Complete",
+    "timestamp": "2026-11-01T11:49:55.383Z",
+    "status": "SUCCESS"
+  },
+  {
+    "id": "log_1793533795374",
+    "action": "Updated User Role",
+    "category": "USERS",
+    "actor": "kuronex_dev",
+    "target": "player_1793533795167",
+    "details": "Role changed to developer by kuronex_dev",
+    "timestamp": "2026-11-01T11:49:55.374Z",
+    "status": "SUCCESS"
+  },
+  {
+    "id": "log_04",
+    "action": "Admin Account Verified",
+    "category": "AUTH",
+    "actor": "kuronex_dev",
+    "target": "kuronex_dev",
+    "details": "Root developer privileges authenticated via security gateway.",
+    "timestamp": "2026-11-01T10:53:06.755Z",
     "status": "SUCCESS"
   },
   {
@@ -30,13 +50,23 @@
     "status": "SUCCESS"
   },
   {
-    "id": "log_04",
-    "action": "Admin Account Verified",
-    "category": "AUTH",
+    "id": "log_02",
+    "action": "Catalog Sync",
+    "category": "GAMES",
     "actor": "kuronex_dev",
-    "target": "kuronex_dev",
-    "details": "Root developer privileges authenticated via security gateway.",
-    "timestamp": "2026-11-01T10:53:06.755Z",
+    "target": "KX-01 Neon Haven",
+    "details": "Updated cartridge asset pipeline and live server cluster status.",
+    "timestamp": "2026-10-31T23:23:06.755Z",
+    "status": "SUCCESS"
+  },
+  {
+    "id": "log_01",
+    "action": "System Initialization",
+    "category": "SYSTEM",
+    "actor": "kuronex_dev",
+    "target": "Kuronex Core Engine",
+    "details": "Platform control system booted with encrypted session management.",
+    "timestamp": "2026-10-31T11:23:06.755Z",
     "status": "SUCCESS"
   }
 ]

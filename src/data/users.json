@@ -3,8 +3,8 @@
     "id": "kuro_dev_admin_root",
     "username": "kuronex_dev",
     "email": "dev.admin@kuronex.internal",
-    "passwordHash": "e4f8b3cd5edc1f9ed1f2dd9bf2dafb13826fe003c076bb0a0477cbdee99c1191eee387d6a53f67a37498b347a3cac91a25d4677950113dccb5cd0ffd510fda08",
-    "salt": "95440bf9a79e209db2319e1bd796dc39",
+    "passwordHash": "5b1fa48a2e194215636d4da3d7eb33f54399d5cbdec1872e63bc661fd66a84c73f233a3dac9d95a502186da32bab9f2745446089c3243506b05e62ff197d105e",
+    "salt": "fed36537de0885b55dfda6ed8ce6f7da",
     "createdAt": "2026-11-01T00:00:00.000Z",
     "role": "admin"
   },

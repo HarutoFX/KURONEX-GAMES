@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import { cookies } from "next/headers";
+import type { NextRequest } from "next/server";
 
 export interface User {
   id: string;
@@ -44,23 +45,51 @@ function ensureFile(filePath: string, defaultContent: string) {
   }
 }
 
-const DEFAULT_ADMIN_USER: User = {
-  id: "kuro_dev_admin_root",
-  username: "kuronex_dev",
-  email: "dev.admin@kuronex.internal",
-  passwordHash: "e4f8b3cd5edc1f9ed1f2dd9bf2dafb13826fe003c076bb0a0477cbdee99c1191eee387d6a53f67a37498b347a3cac91a25d4677950113dccb5cd0ffd510fda08",
-  salt: "95440bf9a79e209db2319e1bd796dc39",
-  createdAt: "2026-11-01T00:00:00.000Z",
-  role: "admin",
-};
+// Safe development-only administrator provisioning
+function provisionDevAdminIfNeeded(users: User[]): boolean {
+  // In production, automatic administrator provisioning is strictly forbidden
+  if (process.env.NODE_ENV === "production") {
+    return false;
+  }
+
+  // Check if an administrator already exists
+  const hasAdmin = users.some((u) => u.role === "admin");
+  if (hasAdmin) return false;
+
+  const devUsername = process.env.DEV_ADMIN_USERNAME || "kuronex_dev";
+  const devEmail = process.env.DEV_ADMIN_EMAIL || "dev.admin@kuronex.internal";
+  let devPassword = process.env.DEV_ADMIN_PASSWORD;
+
+  if (!devPassword) {
+    devPassword = crypto.randomBytes(16).toString("hex") + "!K1";
+    console.warn(`\n[DEV SECURITY] Provisioned local development administrator:`);
+    console.warn(`  Username: ${devUsername}`);
+    console.warn(`  Email:    ${devEmail}`);
+    console.warn(`  Password: ${devPassword}`);
+    console.warn(`  (Set DEV_ADMIN_PASSWORD in .env.local to customize)\n`);
+  }
+
+  const { hash, salt } = hashPassword(devPassword);
+  const devAdmin: User = {
+    id: "kuro_dev_admin_root",
+    username: devUsername,
+    email: devEmail,
+    passwordHash: hash,
+    salt,
+    createdAt: new Date().toISOString(),
+    role: "admin",
+  };
+
+  users.unshift(devAdmin);
+  return true;
+}
 
 function readUsers(): User[] {
   try {
     ensureFile(DB_FILE, "[]");
     const data = fs.readFileSync(DB_FILE, "utf-8");
     const users: User[] = JSON.parse(data || "[]");
-    if (!users.some((u) => u.role === "admin")) {
-      users.unshift(DEFAULT_ADMIN_USER);
+    if (provisionDevAdminIfNeeded(users)) {
       writeUsers(users);
     }
     return users;
@@ -176,11 +205,33 @@ export function deleteSession(token: string) {
   writeSessions(filtered);
 }
 
-export async function getCurrentUser(): Promise<SafeUser | null> {
-  const cookieStore = await cookies();
-  const sessionToken =
-    cookieStore.get(SESSION_COOKIE_NAME)?.value ||
-    cookieStore.get(LEGACY_SESSION_COOKIE_NAME)?.value;
+export async function getSessionUser(req?: NextRequest): Promise<SafeUser | null> {
+  let sessionToken: string | undefined;
+
+  if (req) {
+    sessionToken =
+      req.cookies.get(SESSION_COOKIE_NAME)?.value ||
+      req.cookies.get(LEGACY_SESSION_COOKIE_NAME)?.value;
+
+    if (!sessionToken) {
+      const authHeader = req.headers.get("authorization");
+      if (authHeader && authHeader.toLowerCase().startsWith("bearer ")) {
+        sessionToken = authHeader.substring(7).trim();
+      }
+    }
+  }
+
+  if (!sessionToken) {
+    try {
+      const cookieStore = await cookies();
+      sessionToken =
+        cookieStore.get(SESSION_COOKIE_NAME)?.value ||
+        cookieStore.get(LEGACY_SESSION_COOKIE_NAME)?.value;
+    } catch {
+      // Ignore if called in a context where cookies() is unavailable
+    }
+  }
+
   if (!sessionToken) return null;
 
   const sessions = readSessions();
@@ -191,6 +242,39 @@ export async function getCurrentUser(): Promise<SafeUser | null> {
   if (!user) return null;
 
   return toSafeUser(user);
+}
+
+export async function getCurrentUser(): Promise<SafeUser | null> {
+  return getSessionUser();
+}
+
+export type RequireAdminResult =
+  | { authorized: true; user: SafeUser }
+  | { authorized: false; error: string; status: number };
+
+export async function requireAdmin(req?: NextRequest): Promise<RequireAdminResult> {
+  const user = await getSessionUser(req);
+
+  if (!user) {
+    return {
+      authorized: false,
+      error: "Authentication required. Please sign in with an administrator account.",
+      status: 401,
+    };
+  }
+
+  if (user.role !== "admin") {
+    return {
+      authorized: false,
+      error: "Forbidden. Administrative privileges required.",
+      status: 403,
+    };
+  }
+
+  return {
+    authorized: true,
+    user,
+  };
 }
 
 export { SESSION_COOKIE_NAME, LEGACY_SESSION_COOKIE_NAME, SESSION_DURATION_MS };

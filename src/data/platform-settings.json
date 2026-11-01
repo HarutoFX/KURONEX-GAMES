@@ -6,7 +6,7 @@
   "clientVersion": "v1.4.2",
   "clientDownloadUrl": "/download",
   "supportEmail": "support@kuronex.com",
-  "adminPasskey": "kuronex-admin-2026",
+  "sessionTimeoutDays": 30,
   "maxUploadSizeMb": 120,
   "featuredCategory": "Action"
 }

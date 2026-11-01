@@ -32,7 +32,7 @@ export interface PlatformSettings {
   clientVersion: string;
   clientDownloadUrl: string;
   supportEmail: string;
-  adminPasskey: string;
+  sessionTimeoutDays: number;
   maxUploadSizeMb: number;
   featuredCategory: string;
 }
@@ -193,7 +193,7 @@ export function saveAnnouncements(announcements: Announcement[]): boolean {
   }
 }
 
-export function createAnnouncement(data: Omit<Announcement, "id" | "publishedAt">): Announcement {
+export function createAnnouncement(data: Omit<Announcement, "id" | "publishedAt">, actor = "system"): Announcement {
   const list = getAnnouncements();
   const created: Announcement = {
     ...data,
@@ -202,28 +202,28 @@ export function createAnnouncement(data: Omit<Announcement, "id" | "publishedAt"
   };
   list.unshift(created);
   saveAnnouncements(list);
-  logAdminAction("Created Announcement", "CMS", created.title, `New announcement broadcasted: ${created.title}`);
+  logAdminAction("Created Announcement", "CMS", created.title, `New announcement broadcasted: ${created.title}`, actor);
   return created;
 }
 
-export function toggleAnnouncement(id: string): boolean {
+export function toggleAnnouncement(id: string, actor = "system"): boolean {
   const list = getAnnouncements();
   const item = list.find((a) => a.id === id);
   if (item) {
     item.isActive = !item.isActive;
     saveAnnouncements(list);
-    logAdminAction("Toggle Announcement", "CMS", item.title, `Announcement ${item.title} toggled to ${item.isActive ? "active" : "inactive"}`);
+    logAdminAction("Toggle Announcement", "CMS", item.title, `Announcement ${item.title} toggled to ${item.isActive ? "active" : "inactive"}`, actor);
     return true;
   }
   return false;
 }
 
-export function deleteAnnouncement(id: string): boolean {
+export function deleteAnnouncement(id: string, actor = "system"): boolean {
   const list = getAnnouncements();
   const filtered = list.filter((a) => a.id !== id);
   if (filtered.length !== list.length) {
     saveAnnouncements(filtered);
-    logAdminAction("Delete Announcement", "CMS", id, `Removed announcement ${id}`);
+    logAdminAction("Delete Announcement", "CMS", id, `Removed announcement ${id}`, actor);
     return true;
   }
   return false;
@@ -238,7 +238,7 @@ const DEFAULT_SETTINGS: PlatformSettings = {
   clientVersion: "v1.4.2",
   clientDownloadUrl: "/download",
   supportEmail: "support@kuronex.com",
-  adminPasskey: "kuronex-admin-2026",
+  sessionTimeoutDays: 30,
   maxUploadSizeMb: 120,
   featuredCategory: "Action",
 };
@@ -254,13 +254,13 @@ export function getPlatformSettings(): PlatformSettings {
   }
 }
 
-export function savePlatformSettings(newSettings: Partial<PlatformSettings>): PlatformSettings {
+export function savePlatformSettings(newSettings: Partial<PlatformSettings>, actor = "system"): PlatformSettings {
   const current = getPlatformSettings();
   const updated = { ...current, ...newSettings };
   try {
     ensureFile(SETTINGS_FILE, "[]");
     fs.writeFileSync(SETTINGS_FILE, JSON.stringify(updated, null, 2), "utf-8");
-    logAdminAction("Update Settings", "SETTINGS", "Platform Configuration", "Saved updated system parameters.");
+    logAdminAction("Update Settings", "SETTINGS", "Platform Configuration", "Saved updated system parameters.", actor);
   } catch (error) {
     console.error("Failed to write settings:", error);
   }
@@ -280,7 +280,7 @@ export function getAllUsers(): SafeUser[] {
   }
 }
 
-export function updateUserRole(userId: string, newRole: "player" | "developer" | "admin"): boolean {
+export function updateUserRole(userId: string, newRole: "player" | "developer" | "admin", actor = "system"): boolean {
   try {
     ensureFile(USERS_FILE, "[]");
     const data = fs.readFileSync(USERS_FILE, "utf-8");
@@ -295,7 +295,7 @@ export function updateUserRole(userId: string, newRole: "player" | "developer" |
 
     target.role = newRole;
     fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), "utf-8");
-    logAdminAction("Updated User Role", "USERS", target.username, `Role changed to ${newRole}`);
+    logAdminAction("Updated User Role", "USERS", target.username, `Role changed to ${newRole} by ${actor}`, actor);
     return true;
   } catch (error) {
     console.error("Failed to update user role:", error);
@@ -303,7 +303,7 @@ export function updateUserRole(userId: string, newRole: "player" | "developer" |
   }
 }
 
-export function deleteUser(userId: string): boolean {
+export function deleteUser(userId: string, actor = "system"): boolean {
   try {
     if (userId === "kuro_dev_admin_root") return false; // Protected root admin
 
@@ -315,7 +315,7 @@ export function deleteUser(userId: string): boolean {
 
     if (filtered.length !== users.length) {
       fs.writeFileSync(USERS_FILE, JSON.stringify(filtered, null, 2), "utf-8");
-      logAdminAction("Deleted User Account", "USERS", target?.username || userId, `Removed account permanently from platform registry.`);
+      logAdminAction("Deleted User Account", "USERS", target?.username || userId, `Removed account permanently by ${actor}`, actor);
       return true;
     }
     return false;
@@ -324,3 +324,4 @@ export function deleteUser(userId: string): boolean {
     return false;
   }
 }
+
