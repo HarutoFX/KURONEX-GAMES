@@ -3,14 +3,14 @@
     "id": "act-01",
     "category": "Action",
     "slotNumber": 1,
-    "title": "Neon Haven",
-    "tagline": "Overdrive Protocol",
-    "description": "Navigate an ultra-dense dystopian megacity. Hack cyberware implants, execute high-speed parkour maneuvers, and dismantle rogue AI megacorporations.",
-    "coverImage": "/images/neon_haven.jpg",
-    "badge": "FEATURED",
-    "accentColor": "#FF263D",
-    "progressPercent": 94,
-    "developer": "Kuronex Studios",
+    "title": "Minecraft",
+    "tagline": "Survival",
+    "description": "",
+    "coverImage": "",
+    "badge": "SLOT OPEN",
+    "accentColor": "#00E5FF",
+    "progressPercent": 0,
+    "developer": "",
     "isEmpty": false
   },
   {
@@ -294,4 +294,3 @@
     "isEmpty": true
   }
 ]
-

@@ -1,53 +1,89 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import {
   Shield,
-  Save,
+  KeyRound,
   Plus,
   Trash2,
+  Edit3,
   CheckCircle2,
   AlertCircle,
-  ArrowLeft,
-  KeyRound,
+  Gamepad2,
+  Users,
+  Download,
+  Activity,
   ExternalLink,
+  ArrowLeft,
+  X,
 } from "lucide-react";
+
 import { useAuth } from "@/context/AuthContext";
 import { LibraryGameSlot, DeveloperPartner } from "@/lib/library-store";
+import { GAMES_DATA } from "@/lib/games";
+import { AuditLog, Announcement, PlatformSettings } from "@/lib/admin-store";
+import { SafeUser } from "@/lib/auth";
+
+import { AdminSidebar, AdminTab } from "@/components/admin/AdminSidebar";
+import { AdminHeader } from "@/components/admin/AdminHeader";
+import { MetricCard } from "@/components/admin/MetricCard";
+import { AnalyticsChart } from "@/components/admin/AnalyticsChart";
+import { PlatformHealth } from "@/components/admin/PlatformHealth";
+import { RecentActivity } from "@/components/admin/RecentActivity";
+import { TopGamesTable } from "@/components/admin/TopGamesTable";
 
 const CATEGORIES = ["Action", "RPG", "Sci-Fi", "Strategy", "Survival", "Shooter"] as const;
-const COLOR_PRESETS = ["#FF263D", "#00E5FF", "#A855F7", "#F59E0B", "#10B981", "#38BDF8", "#EC4899"];
-const ICON_OPTIONS = ["Sparkles", "Compass", "ShieldCheck", "Flame", "Cpu", "Trees", "Layers", "Zap"];
 
 export default function AdminPage() {
   const { user } = useAuth();
-  const [adminKey, setAdminKey] = useState<string>(() => {
-    if (typeof window !== "undefined") {
-      return sessionStorage.getItem("kuronex_admin_passkey") || "kuronex-admin-2026";
+
+  // Authentication & Passkey State
+  const [adminKey, setAdminKey] = useState<string>("kuronex-admin-2026");
+  const [sessionAuthed, setSessionAuthed] = useState<boolean>(false);
+
+  // Read stored passkey on client mount
+  useEffect(() => {
+    try {
+      const stored = sessionStorage.getItem("kuronex_admin_passkey");
+      if (stored === "kuronex-admin-2026") {
+        queueMicrotask(() => {
+          setSessionAuthed(true);
+        });
+      }
+    } catch {
+      // ignore
     }
-    return "kuronex-admin-2026";
-  });
-  const [sessionAuthed, setSessionAuthed] = useState<boolean>(() => {
-    if (typeof window !== "undefined") {
-      return sessionStorage.getItem("kuronex_admin_passkey") === "kuronex-admin-2026";
-    }
-    return false;
-  });
+  }, []);
+
   const isAuthenticated = sessionAuthed || user?.role === "admin";
-  const [activeTab, setActiveTab] = useState<"library" | "developers">("library");
 
-  // Library State
+  // Navigation & Layout
+  const [currentTab, setCurrentTab] = useState<AdminTab>("dashboard");
+  const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [globalSearch, setGlobalSearch] = useState("");
+
+  // Data Stores
   const [games, setGames] = useState<LibraryGameSlot[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string>("Action");
-  const [editingSlot, setEditingSlot] = useState<LibraryGameSlot | null>(null);
-
-  // Developers State
   const [developers, setDevelopers] = useState<DeveloperPartner[]>([]);
-  const [editingDev, setEditingDev] = useState<DeveloperPartner | null>(null);
+  const [usersList, setUsersList] = useState<SafeUser[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [settings, setSettings] = useState<PlatformSettings>({
+    platformName: "KURONEX GAMES",
+    tagline: "Build Your Own Library.",
+    maintenanceMode: false,
+    registrationOpen: true,
+    clientVersion: "v1.4.2",
+    clientDownloadUrl: "/download",
+    supportEmail: "support@kuronex.com",
+    adminPasskey: "kuronex-admin-2026",
+    maxUploadSizeMb: 120,
+    featuredCategory: "Action",
+  });
 
-  // Status & Feedback
+  // UI Feedback
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -56,37 +92,110 @@ export default function AdminPage() {
     setTimeout(() => setToast(null), 3500);
   };
 
-  // Load data
+  // Modals & Editing States
+  const [editingSlot, setEditingSlot] = useState<LibraryGameSlot | null>(null);
+  const [editingDev, setEditingDev] = useState<DeveloperPartner | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string>("Action");
+  const [newAnnouncement, setNewAnnouncement] = useState({
+    title: "",
+    message: "",
+    priority: "NORMAL" as Announcement["priority"],
+    category: "UPDATE" as Announcement["category"],
+    isActive: true,
+    author: user?.username || "kuronex_dev",
+  });
+  const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
+
+  // Sync tab with URL query parameters on initial load
   useEffect(() => {
-    async function fetchData() {
-      try {
-        const [gRes, dRes] = await Promise.all([
-          fetch("/api/admin/games"),
-          fetch("/api/admin/developers"),
-        ]);
-        const gData = gRes.ok ? await gRes.json() : null;
-        const dData = dRes.ok ? await dRes.json() : null;
-        if (gData?.games) setGames(gData.games);
-        if (dData?.developers) setDevelopers(dData.developers);
-      } catch (err) {
-        console.error("Failed to load admin data:", err);
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get("tab");
+      if (tabParam) {
+        queueMicrotask(() => {
+          if (tabParam === "library") setCurrentTab("libraries");
+          else if (tabParam === "developers") setCurrentTab("cms");
+          else setCurrentTab(tabParam as AdminTab);
+        });
+      }
+      const catParam = params.get("category");
+      if (catParam) {
+        queueMicrotask(() => {
+          setSelectedCategory(catParam);
+        });
       }
     }
-    fetchData();
   }, []);
 
+  // Fetch all live data when authenticated
+  const loadAllData = useCallback(async () => {
+    try {
+      const headers = { "x-admin-key": adminKey };
+      const [gRes, dRes, uRes, sRes] = await Promise.all([
+        fetch("/api/admin/games", { headers }),
+        fetch("/api/admin/developers", { headers }),
+        fetch("/api/admin/users", { headers }),
+        fetch("/api/admin/system", { headers }),
+      ]);
+
+      if (gRes.ok) {
+        const gData = await gRes.json();
+        if (gData.games) setGames(gData.games);
+      }
+      if (dRes.ok) {
+        const dData = await dRes.json();
+        if (dData.developers) setDevelopers(dData.developers);
+      }
+      if (uRes.ok) {
+        const uData = await uRes.json();
+        if (uData.users) setUsersList(uData.users);
+      }
+      if (sRes.ok) {
+        const sData = await sRes.json();
+        if (sData.logs) setAuditLogs(sData.logs);
+        if (sData.announcements) setAnnouncements(sData.announcements);
+        if (sData.settings) setSettings(sData.settings);
+      }
+    } catch (err) {
+      console.error("Failed to load admin data:", err);
+    }
+  }, [adminKey]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      queueMicrotask(() => {
+        void loadAllData();
+      });
+    }
+  }, [isAuthenticated, loadAllData]);
+
+  // Passkey Login Handler
   const handleKeyAuth = (e: React.FormEvent) => {
     e.preventDefault();
     if (adminKey.trim() === "kuronex-admin-2026" || user?.role === "admin") {
       setSessionAuthed(true);
-      sessionStorage.setItem("kuronex_admin_passkey", adminKey.trim());
-      showToast("Admin access authenticated.");
+      try {
+        sessionStorage.setItem("kuronex_admin_passkey", adminKey.trim());
+      } catch {
+        // ignore
+      }
+      showToast("Admin session authenticated.");
     } else {
-      showToast("Invalid Admin Passkey. Please verify and retry.", "error");
+      showToast("Invalid admin passkey. Please verify and retry.", "error");
     }
   };
 
-  // ─── Save Game Slot ──────────────────────────────────────────────────────────
+  const handleLockSession = () => {
+    setSessionAuthed(false);
+    try {
+      sessionStorage.removeItem("kuronex_admin_passkey");
+    } catch {
+      // ignore
+    }
+    showToast("Admin session locked.");
+  };
+
+  // ─── ACTION HANDLERS ────────────────────────────────────────────────────────
   const handleSaveSlot = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingSlot) return;
@@ -113,36 +222,36 @@ export default function AdminPage() {
 
       setGames((prev) => prev.map((g) => (g.id === updatedSlot.id ? updatedSlot : g)));
       setEditingSlot(null);
-      showToast(`Slot ${updatedSlot.id} saved successfully!`);
+      showToast(`Slot ${updatedSlot.id} (${updatedSlot.title || "Empty"}) saved!`);
+      loadAllData();
     } catch (err) {
       console.error(err);
-      showToast("Error saving game slot. Check network.", "error");
+      showToast("Error saving game slot", "error");
     } finally {
       setIsSaving(false);
     }
   };
 
-  // ─── Reset Slot to Empty ───────────────────────────────────────────────────
   const handleClearSlot = async (slotId: string) => {
-    const target = games.find((g) => g.id === slotId);
-    if (!target) return;
+    if (!confirm(`Are you sure you want to clear slot ${slotId}?`)) return;
 
-    if (!confirm(`Clear slot ${slotId} to an empty placeholder?`)) return;
+    const clearedSlot: LibraryGameSlot = {
+      id: slotId,
+      category: selectedCategory,
+      slotNumber: parseInt(slotId.split("-")[1] || "1", 10),
+      title: "",
+      tagline: "",
+      description: "",
+      coverImage: "",
+      badge: "SLOT OPEN",
+      accentColor: "#FF263D",
+      progressPercent: 0,
+      developer: "",
+      isEmpty: true,
+    };
 
     setIsSaving(true);
     try {
-      const clearedSlot: LibraryGameSlot = {
-        ...target,
-        title: "",
-        tagline: "",
-        description: "",
-        coverImage: "",
-        badge: "SLOT OPEN",
-        progressPercent: 0,
-        developer: "",
-        isEmpty: true,
-      };
-
       const res = await fetch("/api/admin/games", {
         method: "POST",
         headers: {
@@ -156,7 +265,8 @@ export default function AdminPage() {
 
       setGames((prev) => prev.map((g) => (g.id === clearedSlot.id ? clearedSlot : g)));
       if (editingSlot?.id === slotId) setEditingSlot(null);
-      showToast(`Slot ${slotId} reset to empty placeholder.`);
+      showToast(`Slot ${slotId} reset to open.`);
+      loadAllData();
     } catch (err) {
       console.error(err);
       showToast("Error clearing slot", "error");
@@ -165,7 +275,6 @@ export default function AdminPage() {
     }
   };
 
-  // ─── Save Developer ─────────────────────────────────────────────────────────
   const handleSaveDev = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingDev) return;
@@ -195,6 +304,7 @@ export default function AdminPage() {
 
       setEditingDev(null);
       showToast(`Studio ${editingDev.name} saved successfully!`);
+      loadAllData();
     } catch (err) {
       console.error(err);
       showToast("Error saving studio", "error");
@@ -203,7 +313,6 @@ export default function AdminPage() {
     }
   };
 
-  // ─── Delete Developer ───────────────────────────────────────────────────────
   const handleDeleteDev = async (id: string) => {
     if (!confirm("Are you sure you want to remove this partner studio?")) return;
 
@@ -224,6 +333,7 @@ export default function AdminPage() {
       setDevelopers(remaining);
       if (editingDev?.id === id) setEditingDev(null);
       showToast("Studio removed from partner directory.");
+      loadAllData();
     } catch (err) {
       console.error(err);
       showToast("Error deleting studio", "error");
@@ -232,51 +342,214 @@ export default function AdminPage() {
     }
   };
 
+  const handleUpdateRole = async (userId: string, newRole: "player" | "developer" | "admin") => {
+    setIsSaving(true);
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-key": adminKey,
+        },
+        body: JSON.stringify({ action: "updateRole", userId, role: newRole }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to update role");
+
+      setUsersList(data.users);
+      showToast(`User role updated to ${newRole}`);
+      loadAllData();
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : "Error updating role";
+      showToast(errorMsg, "error");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    if (!confirm("Are you sure you want to permanently delete this user account?")) return;
+
+    setIsSaving(true);
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-key": adminKey,
+        },
+        body: JSON.stringify({ action: "deleteUser", userId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to delete user");
+
+      setUsersList(data.users);
+      showToast("User account deleted.");
+      loadAllData();
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : "Error deleting user";
+      showToast(errorMsg, "error");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCreateAnnouncement = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAnnouncement.title.trim() || !newAnnouncement.message.trim()) return;
+
+    setIsSaving(true);
+    try {
+      const res = await fetch("/api/admin/system", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-key": adminKey,
+        },
+        body: JSON.stringify({ action: "createAnnouncement", announcement: newAnnouncement }),
+      });
+
+      if (!res.ok) throw new Error("Failed to create announcement");
+      const data = await res.json();
+      setAnnouncements(data.announcements);
+      setShowAnnouncementModal(false);
+      setNewAnnouncement({
+        title: "",
+        message: "",
+        priority: "NORMAL",
+        category: "UPDATE",
+        isActive: true,
+        author: user?.username || "kuronex_dev",
+      });
+      showToast("Announcement broadcasted successfully!");
+    } catch (err) {
+      console.error(err);
+      showToast("Error creating announcement", "error");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleToggleAnnouncement = async (id: string) => {
+    try {
+      const res = await fetch("/api/admin/system", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-key": adminKey,
+        },
+        body: JSON.stringify({ action: "toggleAnnouncement", id }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAnnouncements(data.announcements);
+        showToast("Announcement status updated.");
+      }
+    } catch {
+      showToast("Error toggling announcement", "error");
+    }
+  };
+
+  const handleDeleteAnnouncement = async (id: string) => {
+    if (!confirm("Are you sure you want to remove this announcement?")) return;
+    try {
+      const res = await fetch("/api/admin/system", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-key": adminKey,
+        },
+        body: JSON.stringify({ action: "deleteAnnouncement", id }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAnnouncements(data.announcements);
+        showToast("Announcement removed.");
+      }
+    } catch {
+      showToast("Error removing announcement", "error");
+    }
+  };
+
+  const handleSaveSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSaving(true);
+    try {
+      const res = await fetch("/api/admin/system", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-key": adminKey,
+        },
+        body: JSON.stringify({ action: "updateSettings", settings }),
+      });
+      if (!res.ok) throw new Error("Failed to save settings");
+      const data = await res.json();
+      setSettings(data.settings);
+      showToast("Platform configuration saved successfully!");
+    } catch {
+      showToast("Error saving platform settings", "error");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   // ─── GATE: UN-AUTHENTICATED ─────────────────────────────────────────────────
   if (!isAuthenticated) {
     return (
-      <main className="relative min-h-screen w-full flex flex-col justify-center items-center px-4 py-16 text-[#F5F5F5] antialiased">
-        <div className="relative z-10 w-full max-w-md overflow-hidden rounded-3xl border border-white/10 bg-[#07080A]/90 p-8 shadow-[0_0_60px_rgba(255,38,61,0.15)] backdrop-blur-2xl">
+      <main className="relative min-h-screen w-full flex flex-col justify-center items-center px-4 py-16 bg-[#080808] text-[#FFFFFF] antialiased">
+        <div className="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-[#35151C] bg-[#100607] p-8 shadow-[0_20px_60px_rgba(0,0,0,0.85)]">
           <div className="text-center mb-6">
-            <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl border border-[#FF263D]/40 bg-[#FF263D]/10 text-[#FF4054] mb-4">
-              <Shield className="h-7 w-7" />
+            <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl border border-[#FF263D]/40 bg-[#1A0D10] text-[#FF263D] mb-4 shadow-[0_0_20px_rgba(255,38,61,0.25)]">
+              <Shield className="h-6 w-6" />
             </div>
-            <h1 className="text-2xl font-bold text-white">Kuronex Admin Manager</h1>
-            <p className="mt-1 text-xs text-[#8F9298]">
-              Authorized platform curators only. Enter passkey to manage library slots and developer studios.
+            <h1 className="text-xl font-bold text-white tracking-wide">
+              KURONEX CONTROL CENTER
+            </h1>
+            <p className="mt-1 text-xs text-[#A1A1AA]">
+              Enterprise-grade administration console. Enter passkey or log in as a platform curator.
             </p>
           </div>
 
           <form onSubmit={handleKeyAuth} className="space-y-4">
             <div>
-              <label className="block text-[11px] font-mono uppercase tracking-wider text-[#8F9298] mb-1.5">
+              <label className="block text-[11px] font-mono uppercase tracking-wider text-[#A1A1AA] mb-1.5">
                 Admin Passkey
               </label>
               <div className="relative flex items-center">
-                <KeyRound className="absolute left-4 h-4 w-4 text-[#8F9298]" />
+                <KeyRound className="absolute left-3.5 h-4 w-4 text-[#A1A1AA]" />
                 <input
                   type="password"
                   required
                   value={adminKey}
                   onChange={(e) => setAdminKey(e.target.value)}
                   placeholder="Enter admin passkey..."
-                  className="w-full rounded-2xl border border-white/10 bg-[rgba(15,20,28,0.7)] py-3 pl-11 pr-4 text-xs sm:text-sm text-[#F5F5F5] placeholder-[#8F9298] outline-none transition focus:border-[#FF263D]/60"
+                  className="w-full rounded-xl border border-[#35151C] bg-[#130A0C] py-2.5 pl-10 pr-4 text-xs sm:text-sm text-[#FFFFFF] placeholder-[#A1A1AA]/50 outline-none transition focus:border-[#FF263D] focus:ring-1 focus:ring-[#FF263D]/40"
                 />
               </div>
             </div>
 
             <button
               type="submit"
-              className="w-full rounded-2xl bg-gradient-to-r from-[#FF4054] to-[#FF263D] py-3 text-xs font-bold text-white shadow-lg transition hover:brightness-110 cursor-pointer"
+              className="w-full rounded-xl bg-[#FF263D] hover:bg-[#FF4054] active:bg-[#D91B30] py-3 text-xs font-bold text-white shadow-[0_4px_20px_rgba(255,38,61,0.35)] transition-all cursor-pointer"
             >
-              Access Admin Panel
+              Access Control Center
             </button>
           </form>
 
-          <div className="mt-6 text-center border-t border-white/10 pt-4">
-            <Link href="/" className="inline-flex items-center gap-1.5 text-xs text-[#8F9298] hover:text-white transition">
+          <div className="mt-6 flex items-center justify-between border-t border-[#35151C] pt-4 text-xs text-[#A1A1AA]">
+            <Link
+              href="/"
+              className="inline-flex items-center gap-1.5 hover:text-white transition"
+            >
               <ArrowLeft className="h-3.5 w-3.5" />
               <span>Back to Home</span>
+            </Link>
+            <Link
+              href="/login"
+              className="text-[#FF263D] hover:underline"
+            >
+              Sign in with Account
             </Link>
           </div>
         </div>
@@ -284,604 +557,909 @@ export default function AdminPage() {
     );
   }
 
-  // ─── DASHBOARD: AUTHENTICATED ───────────────────────────────────────────────
-  const categorySlots = games.filter(
-    (g) => g.category.toLowerCase() === selectedCategory.toLowerCase()
+  // Filtered views based on global search
+  const filteredGames = games.filter(
+    (g) =>
+      g.category.toLowerCase() === selectedCategory.toLowerCase() &&
+      (!globalSearch ||
+        g.title.toLowerCase().includes(globalSearch.toLowerCase()) ||
+        g.developer.toLowerCase().includes(globalSearch.toLowerCase()) ||
+        g.id.toLowerCase().includes(globalSearch.toLowerCase()))
   );
 
+  const filteredCatalogGames = GAMES_DATA.filter(
+    (g) =>
+      !globalSearch ||
+      g.title.toLowerCase().includes(globalSearch.toLowerCase()) ||
+      g.developer.toLowerCase().includes(globalSearch.toLowerCase()) ||
+      g.genre.toLowerCase().includes(globalSearch.toLowerCase())
+  );
+
+  const filteredUsers = usersList.filter(
+    (u) =>
+      !globalSearch ||
+      u.username.toLowerCase().includes(globalSearch.toLowerCase()) ||
+      u.email.toLowerCase().includes(globalSearch.toLowerCase()) ||
+      u.role.toLowerCase().includes(globalSearch.toLowerCase())
+  );
+
+  const filteredDevelopers = developers.filter(
+    (d) =>
+      !globalSearch ||
+      d.name.toLowerCase().includes(globalSearch.toLowerCase()) ||
+      d.genre.toLowerCase().includes(globalSearch.toLowerCase()) ||
+      d.partnerTier.toLowerCase().includes(globalSearch.toLowerCase())
+  );
+
+  const filteredLogs = auditLogs.filter(
+    (l) =>
+      !globalSearch ||
+      l.action.toLowerCase().includes(globalSearch.toLowerCase()) ||
+      l.details.toLowerCase().includes(globalSearch.toLowerCase()) ||
+      l.actor.toLowerCase().includes(globalSearch.toLowerCase())
+  );
+
+  // Computed Section Headers
+  const getTabHeader = () => {
+    switch (currentTab) {
+      case "dashboard":
+        return {
+          title: "Platform Overview",
+          subtitle: "Real-time metrics, platform inventory, and ecosystem health.",
+          action: (
+            <button
+              onClick={() => setCurrentTab("libraries")}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-[#FF263D] px-3.5 py-1.5 text-xs font-bold text-white hover:bg-[#FF4054] transition shadow-[0_2px_12px_rgba(255,38,61,0.3)] cursor-pointer"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>Configure Slots</span>
+            </button>
+          ),
+        };
+      case "analytics":
+        return {
+          title: "Analytics & Telemetry",
+          subtitle: "Player engagement metrics, category performance, and hardware distributions.",
+        };
+      case "games":
+        return {
+          title: "Game Catalog Manager",
+          subtitle: "Inspect game registries, tags, pricing, and live deployment statuses.",
+        };
+      case "users":
+        return {
+          title: "User Account Administration",
+          subtitle: "Manage registered players, developer credentials, and administrative role assignments.",
+        };
+      case "libraries":
+        return {
+          title: "Library Cartridge Slots",
+          subtitle: "Configure curated cartridge slots, accent colors, and showcase slots for player vaults.",
+          action: (
+            <button
+              onClick={() => {
+                const empty = games.find((g) => g.isEmpty && g.category === selectedCategory);
+                if (empty) setEditingSlot(empty);
+                else showToast("All slots filled in this category.", "error");
+              }}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-[#FF263D] px-3.5 py-1.5 text-xs font-bold text-white hover:bg-[#FF4054] transition cursor-pointer"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>Add to Open Slot</span>
+            </button>
+          ),
+        };
+      case "downloads":
+        return {
+          title: "Desktop Client Releases",
+          subtitle: "Manage client binary distribution, checksums, and update manifests.",
+        };
+      case "promotions":
+        return {
+          title: "Promotions & Playtests",
+          subtitle: "Control featured platform banners, seasonal sales, and alpha access key allocations.",
+        };
+      case "cms":
+        return {
+          title: "Partner Studios & CMS",
+          subtitle: "Manage official game studio profiles, partnership tiers, and ticker inclusion.",
+          action: (
+            <button
+              onClick={() =>
+                setEditingDev({
+                  id: `dev_${Date.now()}`,
+                  name: "",
+                  tagline: "",
+                  icon: "Sparkles",
+                  genre: "Action / Sci-Fi",
+                  headquarters: "Tokyo, Japan",
+                  description: "",
+                  gamesCount: 1,
+                  partnerTier: "Studio Partner",
+                  website: "https://",
+                  showInTicker: true,
+                })
+              }
+              className="inline-flex items-center gap-1.5 rounded-xl bg-[#FF263D] px-3.5 py-1.5 text-xs font-bold text-white hover:bg-[#FF4054] transition cursor-pointer"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>Add Partner Studio</span>
+            </button>
+          ),
+        };
+      case "announcements":
+        return {
+          title: "Platform Broadcasts",
+          subtitle: "Publish live announcements, patch notes, and scheduled maintenance notices.",
+          action: (
+            <button
+              onClick={() => setShowAnnouncementModal(true)}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-[#FF263D] px-3.5 py-1.5 text-xs font-bold text-white hover:bg-[#FF4054] transition cursor-pointer"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>New Announcement</span>
+            </button>
+          ),
+        };
+      case "team":
+        return {
+          title: "Platform Operations Team",
+          subtitle: "Authorized curators and platform engineers with administrative credentials.",
+        };
+      case "roles":
+        return {
+          title: "Roles & Permissions Matrix",
+          subtitle: "Fine-grained capability scopes for Players, Developers, Curators, and Super Admins.",
+        };
+      case "audit":
+        return {
+          title: "Security Audit Logs",
+          subtitle: "Tamper-evident record of all platform modifications, role updates, and catalog changes.",
+        };
+      case "settings":
+        return {
+          title: "Platform Configuration",
+          subtitle: "Global runtime flags, maintenance mode, client URLs, and passkeys.",
+        };
+      default:
+        return {
+          title: "Admin Console",
+          subtitle: "Platform management module.",
+        };
+    }
+  };
+
+  const headerInfo = getTabHeader();
+
   return (
-    <div className="relative min-h-screen w-full text-[#F5F5F5] antialiased flex flex-col justify-between">
-      {/* ─── Top Admin Bar ───────────────────────────────────────── */}
-      <header className="sticky top-0 z-40 border-b border-white/10 bg-[#07080A]/90 backdrop-blur-md px-4 sm:px-8 py-3.5 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Link href="/" className="flex items-center gap-2 text-xs font-bold tracking-widest text-white">
-            <span className="flex h-6 w-6 items-center justify-center rounded-lg border border-[#FF263D]/40 bg-[#FF263D]/10 text-[#FF4054] text-xs font-black">
-              K
-            </span>
-            <span>KURONEX</span>
-            <span className="rounded bg-[#FF263D]/20 px-1.5 py-0.2 text-[9px] font-mono text-[#FF4054]">
-              ADMIN
-            </span>
-          </Link>
-
-          <div className="hidden sm:flex items-center gap-2 border-l border-white/10 pl-3">
-            <button
-              onClick={() => {
-                setActiveTab("library");
-                setEditingSlot(null);
-                setEditingDev(null);
-              }}
-              className={`rounded-xl px-3 py-1.5 text-xs font-bold transition cursor-pointer ${
-                activeTab === "library"
-                  ? "bg-[#FF263D] text-white"
-                  : "text-[#8F9298] hover:text-white"
-              }`}
-            >
-              Library Manager
-            </button>
-            <button
-              onClick={() => {
-                setActiveTab("developers");
-                setEditingSlot(null);
-                setEditingDev(null);
-              }}
-              className={`rounded-xl px-3 py-1.5 text-xs font-bold transition cursor-pointer ${
-                activeTab === "developers"
-                  ? "bg-[#FF263D] text-white"
-                  : "text-[#8F9298] hover:text-white"
-              }`}
-            >
-              Developer Studios
-            </button>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <Link
-            href="/library"
-            target="_blank"
-            className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-[#8F9298] hover:text-white transition"
-          >
-            <span>Live Site</span>
-            <ExternalLink className="h-3 w-3" />
-          </Link>
-          <button
-            onClick={() => {
-              sessionStorage.removeItem("kuronex_admin_passkey");
-              setSessionAuthed(false);
-            }}
-            className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-[#8F9298] hover:text-[#FF4054] transition cursor-pointer"
-          >
-            Exit Admin
-          </button>
-        </div>
-      </header>
-
-      {/* ─── Toast Notice ────────────────────────────────────────── */}
+    <div className="min-h-screen bg-[#080808] text-[#FFFFFF] antialiased selection:bg-[#FF263D]/30 selection:text-white">
+      {/* Toast Alert Notification */}
       {toast && (
         <div
-          className={`fixed bottom-6 right-6 z-50 flex items-center gap-2.5 rounded-2xl border px-4 py-3 text-xs font-bold shadow-2xl backdrop-blur-xl animate-in slide-in-from-bottom-5 ${
+          role="status"
+          className={`fixed bottom-6 right-6 z-50 flex items-center gap-2.5 rounded-xl border px-4 py-3 text-xs font-semibold shadow-2xl backdrop-blur-md transition-all ${
             toast.type === "success"
-              ? "border-emerald-500/40 bg-emerald-950/90 text-emerald-300"
-              : "border-red-500/40 bg-red-950/90 text-red-300"
+              ? "border-emerald-500/40 bg-[#130A0C] text-emerald-400"
+              : "border-[#FF263D]/40 bg-[#130A0C] text-[#FF4054]"
           }`}
         >
-          {toast.type === "success" ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+          {toast.type === "success" ? (
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
+          ) : (
+            <AlertCircle className="h-4 w-4 shrink-0 text-[#FF263D]" />
+          )}
           <span>{toast.message}</span>
         </div>
       )}
 
-      {/* ─── Main Admin Body ─────────────────────────────────────── */}
-      <main className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 py-8 flex-1">
-        {/* Mobile Tab Selector */}
-        <div className="flex sm:hidden items-center gap-2 mb-6">
-          <button
-            onClick={() => setActiveTab("library")}
-            className={`flex-1 rounded-xl py-2 text-xs font-bold ${
-              activeTab === "library" ? "bg-[#FF263D] text-white" : "bg-white/5 text-[#8F9298]"
-            }`}
-          >
-            Library Slots
-          </button>
-          <button
-            onClick={() => setActiveTab("developers")}
-            className={`flex-1 rounded-xl py-2 text-xs font-bold ${
-              activeTab === "developers" ? "bg-[#FF263D] text-white" : "bg-white/5 text-[#8F9298]"
-            }`}
-          >
-            Dev Studios
-          </button>
-        </div>
+      {/* Shared Navigation Sidebar */}
+      <AdminSidebar
+        currentTab={currentTab}
+        onSelectTab={(tab) => {
+          setCurrentTab(tab);
+          setEditingSlot(null);
+          setEditingDev(null);
+        }}
+        collapsed={collapsed}
+        onToggleCollapse={() => setCollapsed(!collapsed)}
+        adminUsername={user?.username || "kuronex_dev"}
+        onLockSession={handleLockSession}
+        mobileOpen={mobileOpen}
+        onCloseMobile={() => setMobileOpen(false)}
+      />
 
-        {/* ════════════════════════════════════════════════════════════════════════
-            TAB 1: LIBRARY MANAGER (SLOTS & TITLES)
-           ════════════════════════════════════════════════════════════════════════ */}
-        {activeTab === "library" && (
-          <div className="space-y-8">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
-              <div>
-                <h2 className="text-2xl font-bold text-white">Library Slots Manager</h2>
-                <p className="text-xs text-[#8F9298]">
-                  Manage the 2-4 games displayed for each category. Blank slots will display as clean empty placeholders on the public website.
-                </p>
+      {/* Main Workspace */}
+      <div
+        className={`transition-all duration-300 min-h-screen flex flex-col justify-between ${
+          collapsed ? "lg:pl-[72px]" : "lg:pl-64"
+        }`}
+      >
+        <div>
+          {/* Header */}
+          <AdminHeader
+            searchQuery={globalSearch}
+            onSearchChange={setGlobalSearch}
+            announcements={announcements}
+            onOpenMobile={() => setMobileOpen(true)}
+            title={headerInfo.title}
+            subtitle={headerInfo.subtitle}
+            primaryAction={headerInfo.action}
+          />
+
+          {/* Module Content */}
+          <main className="p-4 sm:p-6 lg:p-8 space-y-6">
+            {/* ─── 1. OVERVIEW DASHBOARD ────────────────────────────────────── */}
+            {currentTab === "dashboard" && (
+              <div className="space-y-6">
+                {/* Metric Cards Row */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <MetricCard
+                    title="Total Registered Players"
+                    value={usersList.length.toLocaleString()}
+                    icon={Users}
+                    change="+18.4%"
+                    changeType="positive"
+                    caption="vs previous 30d"
+                    sparklineData={[3, 5, 4, 8, 9, 12, usersList.length]}
+                  />
+                  <MetricCard
+                    title="Active Sessions"
+                    value={Math.max(usersList.filter((u) => u.role === "admin").length, 1)}
+                    icon={Activity}
+                    change="+12.0%"
+                    changeType="positive"
+                    caption="live connections"
+                    sparklineData={[1, 1, 2, 2, 3, 2, 4]}
+                  />
+                  <MetricCard
+                    title="Catalog Titles"
+                    value={GAMES_DATA.length + games.filter((g) => !g.isEmpty).length}
+                    icon={Gamepad2}
+                    change="+4 titles"
+                    changeType="positive"
+                    caption="active production builds"
+                    sparklineData={[4, 5, 5, 6, 7, 8, 9]}
+                  />
+                  <MetricCard
+                    title="Client Downloads"
+                    value={(1420 + usersList.length * 12).toLocaleString()}
+                    icon={Download}
+                    change="+24.6%"
+                    changeType="positive"
+                    caption="direct client installations"
+                    sparklineData={[800, 920, 1050, 1200, 1340, 1420]}
+                  />
+                </div>
+
+                {/* Main 2-Column Dashboard Split */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                  {/* Left Column: Recent Activity Feed & Audit (5 cols) */}
+                  <div className="lg:col-span-5 space-y-6">
+                    <RecentActivity
+                      logs={filteredLogs}
+                      onViewAllLogs={() => setCurrentTab("audit")}
+                    />
+                    <PlatformHealth />
+                  </div>
+
+                  {/* Right Column: Platform Analytics & Top Titles (7 cols) */}
+                  <div className="lg:col-span-7 space-y-6">
+                    <AnalyticsChart />
+                    <TopGamesTable
+                      games={filteredCatalogGames}
+                      onSelectGame={() => {
+                        setCurrentTab("games");
+                      }}
+                      onViewAll={() => setCurrentTab("games")}
+                    />
+                  </div>
+                </div>
               </div>
+            )}
 
-              {/* Category Selector */}
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-2 sm:pb-0 scrollbar-none">
-                {CATEGORIES.map((cat) => (
-                  <button
-                    key={cat}
-                    onClick={() => {
-                      setSelectedCategory(cat);
-                      setEditingSlot(null);
-                    }}
-                    className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-bold transition cursor-pointer ${
-                      selectedCategory === cat
-                        ? "bg-[#FF263D] text-white shadow-[0_0_15px_rgba(255,38,61,0.35)]"
-                        : "border border-white/10 bg-white/5 text-[#8F9298] hover:text-white"
-                    }`}
-                  >
-                    {cat}
-                  </button>
-                ))}
+            {/* ─── 2. ANALYTICS DEEP DIVE ────────────────────────────────────── */}
+            {currentTab === "analytics" && (
+              <div className="space-y-6">
+                <AnalyticsChart />
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="rounded-2xl border border-[#35151C] bg-[#130A0C] p-5">
+                    <h4 className="text-xs font-mono font-bold text-[#A1A1AA] uppercase mb-4">
+                      Category Distribution
+                    </h4>
+                    <div className="space-y-3">
+                      {CATEGORIES.map((cat, idx) => {
+                        const count = games.filter((g) => g.category === cat && !g.isEmpty).length + (idx === 0 ? 3 : 1);
+                        const pct = Math.min(Math.round((count / 12) * 100), 100);
+                        return (
+                          <div key={cat} className="space-y-1">
+                            <div className="flex justify-between text-xs">
+                              <span className="text-white">{cat}</span>
+                              <span className="text-[#A1A1AA] font-mono">{count} games ({pct}%)</span>
+                            </div>
+                            <div className="h-1.5 w-full bg-[#1A0D10] rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-[#FF263D] rounded-full"
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-[#35151C] bg-[#130A0C] p-5">
+                    <h4 className="text-xs font-mono font-bold text-[#A1A1AA] uppercase mb-4">
+                      Operating System Share
+                    </h4>
+                    <div className="space-y-3">
+                      {[
+                        { os: "Windows (x64 / ARM64)", pct: 68 },
+                        { os: "Linux (Proton / Native)", pct: 19 },
+                        { os: "macOS (Apple Silicon)", pct: 13 },
+                      ].map((item) => (
+                        <div key={item.os} className="space-y-1">
+                          <div className="flex justify-between text-xs">
+                            <span className="text-white">{item.os}</span>
+                            <span className="text-[#A1A1AA] font-mono">{item.pct}%</span>
+                          </div>
+                          <div className="h-1.5 w-full bg-[#1A0D10] rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-emerald-400 rounded-full"
+                              style={{ width: `${item.pct}%` }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-[#35151C] bg-[#130A0C] p-5">
+                    <h4 className="text-xs font-mono font-bold text-[#A1A1AA] uppercase mb-4">
+                      Cloud Sync Health
+                    </h4>
+                    <div className="space-y-3 text-xs">
+                      <div className="flex justify-between p-2.5 rounded-xl border border-[#35151C] bg-[#1A0D10]">
+                        <span className="text-[#A1A1AA]">Sync Success Rate</span>
+                        <span className="font-mono font-bold text-emerald-400">99.98%</span>
+                      </div>
+                      <div className="flex justify-between p-2.5 rounded-xl border border-[#35151C] bg-[#1A0D10]">
+                        <span className="text-[#A1A1AA]">Average Save Size</span>
+                        <span className="font-mono font-bold text-white">4.2 MB</span>
+                      </div>
+                      <div className="flex justify-between p-2.5 rounded-xl border border-[#35151C] bg-[#1A0D10]">
+                        <span className="text-[#A1A1AA]">Cloud Replication Lag</span>
+                        <span className="font-mono font-bold text-[#FF263D]">&lt; 85 ms</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* Slots Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {categorySlots.map((slot) => {
-                const isConfigured = !slot.isEmpty && slot.title.trim().length > 0;
-                return (
-                  <div
-                    key={slot.id}
-                    className="relative flex flex-col justify-between rounded-3xl border border-white/10 bg-[#07080A]/90 p-6 backdrop-blur-md transition hover:border-white/20"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-2">
+            {/* ─── 3. GAME CATALOG MANAGEMENT ─────────────────────────────────── */}
+            {currentTab === "games" && (
+              <div className="space-y-6">
+                <div className="overflow-x-auto rounded-2xl border border-[#35151C] bg-[#130A0C]">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-[#35151C] bg-[#1A0D10]/50 text-[10px] font-mono text-[#A1A1AA] uppercase">
+                        <th className="py-3 px-4">Code</th>
+                        <th className="py-3 px-4">Title</th>
+                        <th className="py-3 px-4">Genre / Category</th>
+                        <th className="py-3 px-4">Developer</th>
+                        <th className="py-3 px-4">Rating</th>
+                        <th className="py-3 px-4">Active Players</th>
+                        <th className="py-3 px-4">Phase</th>
+                        <th className="py-3 px-4 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#35151C]/60 text-white">
+                      {filteredCatalogGames.map((game) => (
+                        <tr key={game.id} className="hover:bg-[#1A0D10]/60 transition-colors">
+                          <td className="py-3 px-4 font-mono text-[#FF263D] font-bold">
+                            {game.projectCode}
+                          </td>
+                          <td className="py-3 px-4 font-semibold">
+                            {game.title}
+                          </td>
+                          <td className="py-3 px-4 text-[#A1A1AA]">
+                            {game.genre} ({game.category})
+                          </td>
+                          <td className="py-3 px-4 text-[#A1A1AA]">
+                            {game.developer}
+                          </td>
+                          <td className="py-3 px-4 font-mono text-amber-400">
+                            ★ {game.rating}
+                          </td>
+                          <td className="py-3 px-4 font-mono">
+                            {game.playerCount}
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className="rounded-md border border-[#35151C] bg-[#1A0D10] px-2 py-0.5 text-[10px] font-mono">
+                              {game.phase}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <button
+                              onClick={() => {
+                                setCurrentTab("libraries");
+                                setSelectedCategory(game.category);
+                              }}
+                              className="inline-flex items-center gap-1 rounded-lg border border-[#35151C] bg-[#1A0D10] px-2.5 py-1 text-xs text-[#A1A1AA] hover:text-white hover:border-[#FF263D]/40 cursor-pointer"
+                            >
+                              <Edit3 className="h-3 w-3" />
+                              <span>Slot</span>
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* ─── 4. USER MANAGEMENT ─────────────────────────────────────────── */}
+            {currentTab === "users" && (
+              <div className="space-y-6">
+                <div className="overflow-x-auto rounded-2xl border border-[#35151C] bg-[#130A0C]">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-[#35151C] bg-[#1A0D10]/50 text-[10px] font-mono text-[#A1A1AA] uppercase">
+                        <th className="py-3 px-4">Player ID</th>
+                        <th className="py-3 px-4">Gamertag</th>
+                        <th className="py-3 px-4">Email</th>
+                        <th className="py-3 px-4">Registered Date</th>
+                        <th className="py-3 px-4">Assigned Role</th>
+                        <th className="py-3 px-4 text-right">Administrative Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#35151C]/60 text-white">
+                      {filteredUsers.map((u) => (
+                        <tr key={u.id} className="hover:bg-[#1A0D10]/60 transition-colors">
+                          <td className="py-3 px-4 font-mono text-[11px] text-[#A1A1AA]">
+                            {u.id}
+                          </td>
+                          <td className="py-3 px-4 font-semibold text-white">
+                            {u.username}
+                          </td>
+                          <td className="py-3 px-4 text-[#A1A1AA]">
+                            {u.email}
+                          </td>
+                          <td className="py-3 px-4 font-mono text-[11px] text-[#A1A1AA]">
+                            {new Date(u.createdAt).toLocaleDateString()}
+                          </td>
+                          <td className="py-3 px-4">
+                            <select
+                              value={u.role}
+                              disabled={u.id === "kuro_dev_admin_root"}
+                              onChange={(e) =>
+                                handleUpdateRole(u.id, e.target.value as "player" | "developer" | "admin")
+                              }
+                              className={`rounded-lg border border-[#35151C] bg-[#1A0D10] px-2 py-1 text-xs font-mono font-bold outline-none cursor-pointer ${
+                                u.role === "admin"
+                                  ? "text-[#FF263D] border-[#FF263D]/40"
+                                  : u.role === "developer"
+                                  ? "text-[#00E5FF] border-[#00E5FF]/40"
+                                  : "text-[#A1A1AA]"
+                              } disabled:opacity-50`}
+                            >
+                              <option value="player">player</option>
+                              <option value="developer">developer</option>
+                              <option value="admin">admin</option>
+                            </select>
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            {u.id !== "kuro_dev_admin_root" ? (
+                              <button
+                                onClick={() => handleDeleteUser(u.id)}
+                                className="inline-flex items-center gap-1 rounded-lg border border-red-500/20 bg-red-500/10 px-2.5 py-1 text-xs font-semibold text-red-400 hover:bg-red-500/20 transition cursor-pointer"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                                <span>Delete</span>
+                              </button>
+                            ) : (
+                              <span className="text-[10px] font-mono text-emerald-400 font-bold uppercase">
+                                Root Secured
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* ─── 5. LIBRARY CARTRIDGE SLOTS (PRESERVED) ─────────────────────── */}
+            {currentTab === "libraries" && (
+              <div className="space-y-6">
+                {/* Category Selector Tabs */}
+                <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+                  {CATEGORIES.map((cat) => (
+                    <button
+                      key={cat}
+                      onClick={() => {
+                        setSelectedCategory(cat);
+                        setEditingSlot(null);
+                      }}
+                      className={`rounded-full px-4 py-1.5 text-xs font-bold transition-all cursor-pointer ${
+                        selectedCategory === cat
+                          ? "bg-[#FF263D] text-white shadow-[0_0_15px_rgba(255,38,61,0.35)]"
+                          : "border border-[#35151C] bg-[#130A0C] text-[#A1A1AA] hover:text-white"
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+
+                {/* 6-Slot Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {filteredGames.map((slot) => (
+                    <div
+                      key={slot.id}
+                      className={`relative flex flex-col justify-between rounded-2xl border p-5 transition-all ${
+                        editingSlot?.id === slot.id
+                          ? "border-[#FF263D] ring-2 ring-[#FF263D]/30 bg-[#1A0D10]"
+                          : "border-[#35151C] bg-[#130A0C] hover:border-[#FF263D]/40"
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center justify-between pb-3 border-b border-[#35151C]/60 mb-3">
+                          <span className="font-mono text-xs font-bold text-[#FF263D]">
+                            {slot.id}
+                          </span>
                           <span
-                            className="h-2 w-2 rounded-full"
-                            style={{ backgroundColor: isConfigured ? slot.accentColor : "#8F9298" }}
-                          />
-                          <span className="font-mono text-xs font-bold text-[#F5F5F5]">
-                            {slot.category.toUpperCase()} • SLOT {slot.slotNumber}
+                            className={`rounded-md px-2 py-0.5 text-[9px] font-mono font-bold ${
+                              slot.isEmpty
+                                ? "border border-[#35151C] text-[#A1A1AA]"
+                                : "border border-[#FF263D]/40 bg-[#FF263D]/10 text-[#FF4054]"
+                            }`}
+                          >
+                            {slot.badge}
                           </span>
                         </div>
-                        <span
-                          className={`rounded-full px-2.5 py-0.5 text-[10px] font-mono font-bold ${
-                            isConfigured
-                              ? "border border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
-                              : "border border-white/10 bg-white/5 text-[#8F9298]"
-                          }`}
-                        >
-                          {isConfigured ? "CONFIGURED" : "EMPTY SLOT"}
-                        </span>
-                      </div>
 
-                      {/* Mini Preview Box */}
-                      <div className="relative aspect-[16/9] w-full overflow-hidden rounded-2xl border border-white/10 bg-[#020405] mb-4">
-                        {isConfigured && slot.coverImage ? (
-                          <Image src={slot.coverImage} alt={slot.title} fill className="object-cover" />
+                        {slot.isEmpty ? (
+                          <div className="py-8 text-center text-xs text-[#A1A1AA]">
+                            Empty Vault Slot
+                          </div>
                         ) : (
-                          <div className="flex h-full w-full flex-col items-center justify-center text-center p-4">
-                            <span className="font-mono text-[11px] text-[#8F9298] uppercase">
-                              Slot Available
-                            </span>
-                            <span className="text-[10px] text-[#606368]">No image configured</span>
+                          <div className="space-y-1.5">
+                            <h4 className="text-base font-bold text-white truncate">
+                              {slot.title}
+                            </h4>
+                            <p className="text-xs text-[#A1A1AA] line-clamp-2">
+                              {slot.tagline || slot.description}
+                            </p>
+                            <div className="pt-2 text-[10px] font-mono text-[#A1A1AA]">
+                              Developer: <span className="text-white">{slot.developer}</span>
+                            </div>
                           </div>
                         )}
                       </div>
 
-                      <h3 className="text-lg font-bold text-white">
-                        {isConfigured ? slot.title : "(Empty Slot - No Title)"}
-                      </h3>
-                      <p className="text-xs text-[#8F9298] mt-0.5">
-                        {isConfigured ? slot.tagline : "Will render as empty hardware cartridge slot"}
-                      </p>
-                      {isConfigured && (
-                        <p className="text-xs text-[#8F9298] mt-2 line-clamp-2">{slot.description}</p>
-                      )}
-                    </div>
-
-                    <div className="mt-6 border-t border-white/10 pt-4 flex items-center justify-between">
-                      <button
-                        onClick={() => setEditingSlot({ ...slot })}
-                        className="rounded-full bg-gradient-to-r from-[#FF4054] to-[#FF263D] px-4 py-1.5 text-xs font-bold text-white shadow-md hover:brightness-110 transition cursor-pointer"
-                      >
-                        Edit This Slot
-                      </button>
-
-                      {isConfigured && (
+                      <div className="mt-4 flex items-center justify-between border-t border-[#35151C]/60 pt-3">
                         <button
-                          onClick={() => handleClearSlot(slot.id)}
-                          className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-[#8F9298] hover:text-red-400 hover:border-red-500/30 transition cursor-pointer"
+                          onClick={() => setEditingSlot(slot)}
+                          className="inline-flex items-center gap-1 rounded-lg border border-[#35151C] bg-[#1A0D10] px-3 py-1 text-xs font-semibold text-white hover:border-[#FF263D]/40 transition cursor-pointer"
                         >
-                          Clear to Empty
+                          <Edit3 className="h-3 w-3" />
+                          <span>Configure</span>
                         </button>
-                      )}
+                        {!slot.isEmpty && (
+                          <button
+                            onClick={() => handleClearSlot(slot.id)}
+                            className="text-xs text-[#A1A1AA] hover:text-[#FF263D] transition cursor-pointer"
+                          >
+                            Reset
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  ))}
+                </div>
 
-            {/* Slot Edit Modal */}
-            {editingSlot && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 overflow-y-auto">
-                <div className="relative w-full max-w-2xl my-8 rounded-3xl border border-[#FF263D]/40 bg-[#07080A] p-6 sm:p-8 shadow-[0_0_60px_rgba(255,38,61,0.25)]">
-                  <div className="flex items-center justify-between pb-4 border-b border-white/10">
-                    <div>
-                      <span className="font-mono text-xs font-bold text-[#FF4054]">
-                        EDITING {editingSlot.category.toUpperCase()} • SLOT {editingSlot.slotNumber}
-                      </span>
-                      <h3 className="text-xl font-bold text-white mt-0.5">
-                        Configure Game Metadata & Image
-                      </h3>
+                {/* Edit Form Modal/Drawer */}
+                {editingSlot && (
+                  <div className="rounded-2xl border border-[#35151C] bg-[#130A0C] p-6 space-y-4">
+                    <div className="flex items-center justify-between pb-3 border-b border-[#35151C]">
+                      <h4 className="text-sm font-bold text-white">
+                        Configure Slot: {editingSlot.id} ({selectedCategory})
+                      </h4>
+                      <button
+                        onClick={() => setEditingSlot(null)}
+                        className="text-[#A1A1AA] hover:text-white"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
                     </div>
-                    <button
-                      onClick={() => setEditingSlot(null)}
-                      className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-[#8F9298] hover:text-white"
-                    >
-                      Cancel
-                    </button>
-                  </div>
 
-                  <form onSubmit={handleSaveSlot} className="mt-6 space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <form onSubmit={handleSaveSlot} className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-[11px] font-mono text-[#8F9298] uppercase mb-1">
-                          Game Title (Leave empty for blank slot)
+                        <label className="block text-xs font-semibold text-[#A1A1AA] mb-1">
+                          Game Title
                         </label>
                         <input
                           type="text"
                           value={editingSlot.title}
-                          onChange={(e) => setEditingSlot({ ...editingSlot, title: e.target.value })}
+                          onChange={(e) =>
+                            setEditingSlot({ ...editingSlot, title: e.target.value })
+                          }
                           placeholder="e.g. Neon Haven"
-                          className="w-full rounded-2xl border border-white/10 bg-[rgba(15,20,28,0.7)] px-4 py-2.5 text-xs sm:text-sm text-white placeholder-[#8F9298] outline-none focus:border-[#FF263D]/60"
+                          className="w-full rounded-xl border border-[#35151C] bg-[#1A0D10] p-2.5 text-xs text-white outline-none focus:border-[#FF263D]"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-[11px] font-mono text-[#8F9298] uppercase mb-1">
+                        <label className="block text-xs font-semibold text-[#A1A1AA] mb-1">
                           Tagline
                         </label>
                         <input
                           type="text"
                           value={editingSlot.tagline}
-                          onChange={(e) => setEditingSlot({ ...editingSlot, tagline: e.target.value })}
-                          placeholder="e.g. Overdrive Protocol"
-                          className="w-full rounded-2xl border border-white/10 bg-[rgba(15,20,28,0.7)] px-4 py-2.5 text-xs sm:text-sm text-white placeholder-[#8F9298] outline-none focus:border-[#FF263D]/60"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-mono text-[#8F9298] uppercase mb-1">
-                        Cover Image Path or URL
-                      </label>
-                      <input
-                        type="text"
-                        value={editingSlot.coverImage}
-                        onChange={(e) => setEditingSlot({ ...editingSlot, coverImage: e.target.value })}
-                        placeholder="e.g. /images/neon_haven.jpg or https://..."
-                        className="w-full rounded-2xl border border-white/10 bg-[rgba(15,20,28,0.7)] px-4 py-2.5 text-xs sm:text-sm text-white placeholder-[#8F9298] outline-none focus:border-[#FF263D]/60"
-                      />
-                      <span className="text-[10px] text-[#8F9298] mt-1 block">
-                        Tip: Available project images include: /images/neon_haven.jpg, /images/frostbound.jpg, /images/voidstrike.jpg, /images/nightfall_realms.jpg, /images/project_kaiju.jpg, /images/the_last_grove.jpg, /images/echoes_of_solara.jpg, /images/twin_ashes.jpg, /images/parallel_minds.jpg
-                      </span>
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-mono text-[#8F9298] uppercase mb-1">
-                        Description
-                      </label>
-                      <textarea
-                        rows={3}
-                        value={editingSlot.description}
-                        onChange={(e) => setEditingSlot({ ...editingSlot, description: e.target.value })}
-                        placeholder="Game synopsis and player experience description..."
-                        className="w-full rounded-2xl border border-white/10 bg-[rgba(15,20,28,0.7)] px-4 py-2.5 text-xs sm:text-sm text-white placeholder-[#8F9298] outline-none focus:border-[#FF263D]/60 resize-none"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-[11px] font-mono text-[#8F9298] uppercase mb-1">
-                          Status Badge
-                        </label>
-                        <input
-                          type="text"
-                          value={editingSlot.badge}
-                          onChange={(e) => setEditingSlot({ ...editingSlot, badge: e.target.value })}
-                          placeholder="e.g. FEATURED, PLAYTEST"
-                          className="w-full rounded-2xl border border-white/10 bg-[rgba(15,20,28,0.7)] px-4 py-2.5 text-xs text-white outline-none focus:border-[#FF263D]/60"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] font-mono text-[#8F9298] uppercase mb-1">
-                          Readiness % ({editingSlot.progressPercent}%)
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          max="100"
-                          value={editingSlot.progressPercent}
                           onChange={(e) =>
-                            setEditingSlot({ ...editingSlot, progressPercent: Number(e.target.value) || 0 })
+                            setEditingSlot({ ...editingSlot, tagline: e.target.value })
                           }
-                          className="w-full rounded-2xl border border-white/10 bg-[rgba(15,20,28,0.7)] px-4 py-2.5 text-xs text-white outline-none focus:border-[#FF263D]/60"
+                          placeholder="e.g. Overdrive Protocol"
+                          className="w-full rounded-xl border border-[#35151C] bg-[#1A0D10] p-2.5 text-xs text-white outline-none focus:border-[#FF263D]"
+                        />
+                      </div>
+
+                      <div className="md:col-span-2">
+                        <label className="block text-xs font-semibold text-[#A1A1AA] mb-1">
+                          Description
+                        </label>
+                        <textarea
+                          rows={3}
+                          value={editingSlot.description}
+                          onChange={(e) =>
+                            setEditingSlot({ ...editingSlot, description: e.target.value })
+                          }
+                          placeholder="Short summary of gameplay..."
+                          className="w-full rounded-xl border border-[#35151C] bg-[#1A0D10] p-2.5 text-xs text-white outline-none focus:border-[#FF263D]"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-[11px] font-mono text-[#8F9298] uppercase mb-1">
+                        <label className="block text-xs font-semibold text-[#A1A1AA] mb-1">
                           Developer Studio
                         </label>
                         <input
                           type="text"
                           value={editingSlot.developer}
-                          onChange={(e) => setEditingSlot({ ...editingSlot, developer: e.target.value })}
+                          onChange={(e) =>
+                            setEditingSlot({ ...editingSlot, developer: e.target.value })
+                          }
                           placeholder="e.g. Kuronex Studios"
-                          className="w-full rounded-2xl border border-white/10 bg-[rgba(15,20,28,0.7)] px-4 py-2.5 text-xs text-white outline-none focus:border-[#FF263D]/60"
+                          className="w-full rounded-xl border border-[#35151C] bg-[#1A0D10] p-2.5 text-xs text-white outline-none focus:border-[#FF263D]"
                         />
                       </div>
-                    </div>
 
-                    <div>
-                      <label className="block text-[11px] font-mono text-[#8F9298] uppercase mb-1.5">
-                        Accent Color Theme
-                      </label>
-                      <div className="flex items-center gap-2">
-                        {COLOR_PRESETS.map((col) => (
-                          <button
-                            key={col}
-                            type="button"
-                            onClick={() => setEditingSlot({ ...editingSlot, accentColor: col })}
-                            style={{ backgroundColor: col }}
-                            className={`h-7 w-7 rounded-full border-2 transition cursor-pointer ${
-                              editingSlot.accentColor === col ? "border-white scale-110" : "border-transparent"
-                            }`}
-                          />
-                        ))}
+                      <div>
+                        <label className="block text-xs font-semibold text-[#A1A1AA] mb-1">
+                          Status Badge
+                        </label>
+                        <input
+                          type="text"
+                          value={editingSlot.badge}
+                          onChange={(e) =>
+                            setEditingSlot({ ...editingSlot, badge: e.target.value })
+                          }
+                          placeholder="e.g. FEATURED, TRENDING, NEW"
+                          className="w-full rounded-xl border border-[#35151C] bg-[#1A0D10] p-2.5 text-xs text-white outline-none focus:border-[#FF263D]"
+                        />
+                      </div>
+
+                      <div className="md:col-span-2 flex justify-end gap-3 pt-3 border-t border-[#35151C]">
+                        <button
+                          type="button"
+                          onClick={() => setEditingSlot(null)}
+                          className="rounded-xl border border-[#35151C] px-4 py-2 text-xs font-semibold text-[#A1A1AA] hover:text-white cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={isSaving}
+                          className="rounded-xl bg-[#FF263D] hover:bg-[#FF4054] px-5 py-2 text-xs font-bold text-white transition cursor-pointer"
+                        >
+                          {isSaving ? "Saving..." : "Save Slot Configuration"}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ─── 6. DOWNLOADS & CLIENT RELEASES ─────────────────────────────── */}
+            {currentTab === "downloads" && (
+              <div className="space-y-6">
+                <div className="rounded-2xl border border-[#35151C] bg-[#130A0C] p-6 space-y-4">
+                  <h4 className="text-sm font-bold text-white mb-2">
+                    Current Public Desktop Client
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="p-4 rounded-xl border border-[#35151C] bg-[#1A0D10]">
+                      <div className="text-xs text-[#A1A1AA]">Client Version</div>
+                      <div className="text-lg font-bold text-white mt-1">
+                        {settings.clientVersion}
                       </div>
                     </div>
-
-                    <div className="pt-4 border-t border-white/10 flex items-center justify-end gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setEditingSlot(null)}
-                        className="rounded-full border border-white/10 bg-white/5 px-5 py-2.5 text-xs text-[#8F9298] hover:text-white"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={isSaving}
-                        className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#FF4054] to-[#FF263D] px-6 py-2.5 text-xs font-bold text-white shadow-lg hover:brightness-110 disabled:opacity-50 cursor-pointer"
-                      >
-                        <Save className="h-4 w-4" />
-                        <span>{isSaving ? "Saving Slot..." : "Save Changes"}</span>
-                      </button>
+                    <div className="p-4 rounded-xl border border-[#35151C] bg-[#1A0D10]">
+                      <div className="text-xs text-[#A1A1AA]">Installer Route</div>
+                      <div className="text-xs font-mono text-[#FF263D] mt-2 truncate">
+                        {settings.clientDownloadUrl}
+                      </div>
                     </div>
-                  </form>
+                    <div className="p-4 rounded-xl border border-[#35151C] bg-[#1A0D10]">
+                      <div className="text-xs text-[#A1A1AA]">Status</div>
+                      <div className="text-xs font-mono font-bold text-emerald-400 mt-2">
+                        LIVE DISTRIBUTION
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
-          </div>
-        )}
 
-        {/* ════════════════════════════════════════════════════════════════════════
-            TAB 2: DEVELOPER STUDIOS MANAGER
-           ════════════════════════════════════════════════════════════════════════ */}
-        {activeTab === "developers" && (
-          <div className="space-y-8">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
-              <div>
-                <h2 className="text-2xl font-bold text-white">Partner Developer Studios</h2>
-                <p className="text-xs text-[#8F9298]">
-                  Manage the game development companies featured on the public website and in the continuous moving ticker strip.
-                </p>
-              </div>
-
-              <button
-                onClick={() =>
-                  setEditingDev({
-                    id: `dev-${Date.now().toString().slice(-4)}`,
-                    name: "",
-                    tagline: "",
-                    icon: "Sparkles",
-                    genre: "Action RPG",
-                    headquarters: "Global",
-                    description: "",
-                    gamesCount: 1,
-                    partnerTier: "Studio Partner",
-                    website: "https://",
-                    showInTicker: true,
-                  })
-                }
-                className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#FF4054] to-[#FF263D] px-4 py-2 text-xs font-bold text-white shadow-md hover:brightness-110 transition cursor-pointer"
-              >
-                <Plus className="h-4 w-4" />
-                <span>Add Partner Studio</span>
-              </button>
-            </div>
-
-            {/* Developers Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {developers.map((dev) => (
-                <div
-                  key={dev.id}
-                  className="relative flex flex-col justify-between rounded-3xl border border-white/10 bg-[#07080A]/90 p-6 backdrop-blur-md transition hover:border-white/20"
-                >
-                  <div>
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-0.5 text-[10px] font-mono text-[#FF4054]">
-                        {dev.partnerTier}
-                      </span>
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-[10px] font-mono ${
-                          dev.showInTicker
-                            ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
-                            : "bg-white/5 text-[#8F9298] border border-white/10"
-                        }`}
-                      >
-                        {dev.showInTicker ? "Ticker Active" : "Ticker Hidden"}
-                      </span>
-                    </div>
-
-                    <h3 className="text-xl font-bold text-white">{dev.name}</h3>
-                    <p className="text-xs font-semibold text-[#8F9298] mt-0.5">{dev.tagline}</p>
-
-                    <p className="mt-3 text-xs text-[#8F9298] line-clamp-3 leading-relaxed">
-                      {dev.description}
+            {/* ─── 7. PROMOTIONS ──────────────────────────────────────────────── */}
+            {currentTab === "promotions" && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="rounded-2xl border border-[#35151C] bg-[#130A0C] p-6 space-y-3">
+                    <h4 className="text-sm font-bold text-white">Alpha Playtest Key Allocation</h4>
+                    <p className="text-xs text-[#A1A1AA]">
+                      Control automated key distribution drops for waitlist players.
                     </p>
-
-                    <div className="mt-4 pt-3 border-t border-white/10 text-[11px] font-mono text-[#8F9298] flex items-center justify-between">
-                      <span>HQ: {dev.headquarters}</span>
-                      <span className="text-[#00E5FF]">{dev.genre}</span>
+                    <div className="pt-2">
+                      <span className="inline-block rounded-md border border-[#FF263D]/40 bg-[#FF263D]/10 px-3 py-1 text-xs font-mono font-bold text-[#FF4054]">
+                        2,500 / 5,000 Keys Claimed
+                      </span>
                     </div>
                   </div>
 
-                  <div className="mt-6 border-t border-white/10 pt-4 flex items-center justify-between">
-                    <button
-                      onClick={() => setEditingDev({ ...dev })}
-                      className="rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-bold text-white hover:bg-white/10 transition cursor-pointer"
+                  <div className="rounded-2xl border border-[#35151C] bg-[#130A0C] p-6 space-y-3">
+                    <h4 className="text-sm font-bold text-white">Seasonal Hero Spotlight</h4>
+                    <p className="text-xs text-[#A1A1AA]">
+                      KX-01 Neon Haven currently featured as primary platform header.
+                    </p>
+                    <Link
+                      href="/"
+                      className="inline-flex items-center gap-1.5 text-xs text-[#FF263D] hover:underline"
                     >
-                      Edit Studio
-                    </button>
-
-                    <button
-                      onClick={() => handleDeleteDev(dev.id)}
-                      className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/5 text-[#8F9298] hover:text-red-400 hover:border-red-500/30 transition cursor-pointer"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                      <span>Preview Live Banner</span>
+                      <ExternalLink className="h-3 w-3" />
+                    </Link>
                   </div>
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
 
-            {/* Developer Edit Modal */}
-            {editingDev && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 overflow-y-auto">
-                <div className="relative w-full max-w-xl my-8 rounded-3xl border border-[#FF263D]/40 bg-[#07080A] p-6 sm:p-8 shadow-[0_0_60px_rgba(255,38,61,0.25)]">
-                  <div className="flex items-center justify-between pb-4 border-b border-white/10">
-                    <h3 className="text-xl font-bold text-white">
-                      {developers.some((d) => d.id === editingDev.id)
-                        ? `Edit Studio: ${editingDev.name}`
-                        : "Add New Partner Studio"}
-                    </h3>
-                    <button
-                      onClick={() => setEditingDev(null)}
-                      className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-[#8F9298] hover:text-white"
-                    >
-                      Cancel
-                    </button>
-                  </div>
+            {/* ─── 8. CMS: PARTNER STUDIOS (PRESERVED) ────────────────────────── */}
+            {currentTab === "cms" && (
+              <div className="space-y-6">
+                <div className="overflow-x-auto rounded-2xl border border-[#35151C] bg-[#130A0C]">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-[#35151C] bg-[#1A0D10]/50 text-[10px] font-mono text-[#A1A1AA] uppercase">
+                        <th className="py-3 px-4">Studio Name</th>
+                        <th className="py-3 px-4">Tagline</th>
+                        <th className="py-3 px-4">Tier</th>
+                        <th className="py-3 px-4">Headquarters</th>
+                        <th className="py-3 px-4">Games</th>
+                        <th className="py-3 px-4">Ticker</th>
+                        <th className="py-3 px-4 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#35151C]/60 text-white">
+                      {filteredDevelopers.map((dev) => (
+                        <tr key={dev.id} className="hover:bg-[#1A0D10]/60 transition-colors">
+                          <td className="py-3 px-4 font-semibold text-white">
+                            {dev.name}
+                          </td>
+                          <td className="py-3 px-4 text-[#A1A1AA] max-w-xs truncate">
+                            {dev.tagline}
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className="rounded-md border border-[#FF263D]/30 bg-[#FF263D]/10 px-2 py-0.5 text-[9px] font-mono font-bold text-[#FF263D]">
+                              {dev.partnerTier}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-[#A1A1AA]">
+                            {dev.headquarters}
+                          </td>
+                          <td className="py-3 px-4 font-mono">
+                            {dev.gamesCount}
+                          </td>
+                          <td className="py-3 px-4">
+                            <span
+                              className={`h-2 w-2 rounded-full inline-block ${
+                                dev.showInTicker ? "bg-emerald-400" : "bg-[#A1A1AA]"
+                              }`}
+                            />
+                          </td>
+                          <td className="py-3 px-4 text-right space-x-2">
+                            <button
+                              onClick={() => setEditingDev(dev)}
+                              className="text-xs text-[#A1A1AA] hover:text-white cursor-pointer"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleDeleteDev(dev.id)}
+                              className="text-xs text-red-400 hover:text-red-300 cursor-pointer"
+                            >
+                              Delete
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
 
-                  <form onSubmit={handleSaveDev} className="mt-6 space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Edit Developer Modal */}
+                {editingDev && (
+                  <div className="rounded-2xl border border-[#35151C] bg-[#130A0C] p-6 space-y-4">
+                    <div className="flex items-center justify-between pb-3 border-b border-[#35151C]">
+                      <h4 className="text-sm font-bold text-white">
+                        {editingDev.name ? `Edit Studio: ${editingDev.name}` : "Add Partner Studio"}
+                      </h4>
+                      <button
+                        onClick={() => setEditingDev(null)}
+                        className="text-[#A1A1AA] hover:text-white"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+
+                    <form onSubmit={handleSaveDev} className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-[11px] font-mono text-[#8F9298] uppercase mb-1">
-                          Studio / Company Name
+                        <label className="block text-xs font-semibold text-[#A1A1AA] mb-1">
+                          Studio Name
                         </label>
                         <input
                           type="text"
                           required
                           value={editingDev.name}
                           onChange={(e) => setEditingDev({ ...editingDev, name: e.target.value })}
-                          placeholder="e.g. Aether Dynamics"
-                          className="w-full rounded-2xl border border-white/10 bg-[rgba(15,20,28,0.7)] px-4 py-2.5 text-xs sm:text-sm text-white placeholder-[#8F9298] outline-none focus:border-[#FF263D]/60"
+                          className="w-full rounded-xl border border-[#35151C] bg-[#1A0D10] p-2.5 text-xs text-white outline-none focus:border-[#FF263D]"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-[11px] font-mono text-[#8F9298] uppercase mb-1">
+                        <label className="block text-xs font-semibold text-[#A1A1AA] mb-1">
                           Tagline
                         </label>
                         <input
                           type="text"
                           value={editingDev.tagline}
-                          onChange={(e) => setEditingDev({ ...editingDev, tagline: e.target.value })}
-                          placeholder="e.g. Zero-G Physics Specialists"
-                          className="w-full rounded-2xl border border-white/10 bg-[rgba(15,20,28,0.7)] px-4 py-2.5 text-xs sm:text-sm text-white placeholder-[#8F9298] outline-none focus:border-[#FF263D]/60"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-[11px] font-mono text-[#8F9298] uppercase mb-1">
-                          Icon Motif
-                        </label>
-                        <select
-                          value={editingDev.icon}
-                          onChange={(e) => setEditingDev({ ...editingDev, icon: e.target.value })}
-                          className="w-full rounded-2xl border border-white/10 bg-[#07080A] px-4 py-2.5 text-xs text-white outline-none focus:border-[#FF263D]/60 cursor-pointer"
-                        >
-                          {ICON_OPTIONS.map((ico) => (
-                            <option key={ico} value={ico}>
-                              {ico}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-[11px] font-mono text-[#8F9298] uppercase mb-1">
-                          Genre Focus
-                        </label>
-                        <input
-                          type="text"
-                          value={editingDev.genre}
-                          onChange={(e) => setEditingDev({ ...editingDev, genre: e.target.value })}
-                          placeholder="e.g. Space Simulation"
-                          className="w-full rounded-2xl border border-white/10 bg-[rgba(15,20,28,0.7)] px-4 py-2.5 text-xs text-white outline-none focus:border-[#FF263D]/60"
+                          onChange={(e) =>
+                            setEditingDev({ ...editingDev, tagline: e.target.value })
+                          }
+                          className="w-full rounded-xl border border-[#35151C] bg-[#1A0D10] p-2.5 text-xs text-white outline-none focus:border-[#FF263D]"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-[11px] font-mono text-[#8F9298] uppercase mb-1">
-                          Headquarters
-                        </label>
-                        <input
-                          type="text"
-                          value={editingDev.headquarters}
-                          onChange={(e) => setEditingDev({ ...editingDev, headquarters: e.target.value })}
-                          placeholder="e.g. Tokyo, Japan"
-                          className="w-full rounded-2xl border border-white/10 bg-[rgba(15,20,28,0.7)] px-4 py-2.5 text-xs text-white outline-none focus:border-[#FF263D]/60"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-mono text-[#8F9298] uppercase mb-1">
-                        Studio Bio / Philosophy
-                      </label>
-                      <textarea
-                        rows={3}
-                        value={editingDev.description}
-                        onChange={(e) => setEditingDev({ ...editingDev, description: e.target.value })}
-                        placeholder="Brief studio description..."
-                        className="w-full rounded-2xl border border-white/10 bg-[rgba(15,20,28,0.7)] px-4 py-2.5 text-xs sm:text-sm text-white placeholder-[#8F9298] outline-none focus:border-[#FF263D]/60 resize-none"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-[11px] font-mono text-[#8F9298] uppercase mb-1">
-                          Partner Tier
+                        <label className="block text-xs font-semibold text-[#A1A1AA] mb-1">
+                          Partnership Tier
                         </label>
                         <select
                           value={editingDev.partnerTier}
                           onChange={(e) =>
                             setEditingDev({
                               ...editingDev,
-                              partnerTier: e.target.value as "Premier Partner" | "Studio Partner" | "Indie Pioneer",
+                              partnerTier: e.target.value as DeveloperPartner["partnerTier"],
                             })
                           }
-                          className="w-full rounded-2xl border border-white/10 bg-[#07080A] px-4 py-2.5 text-xs text-white outline-none focus:border-[#FF263D]/60 cursor-pointer"
+                          className="w-full rounded-xl border border-[#35151C] bg-[#1A0D10] p-2.5 text-xs text-white outline-none focus:border-[#FF263D]"
                         >
                           <option value="Premier Partner">Premier Partner</option>
                           <option value="Studio Partner">Studio Partner</option>
@@ -890,57 +1468,459 @@ export default function AdminPage() {
                       </div>
 
                       <div>
-                        <label className="block text-[11px] font-mono text-[#8F9298] uppercase mb-1">
-                          Website URL
+                        <label className="block text-xs font-semibold text-[#A1A1AA] mb-1">
+                          Headquarters
                         </label>
                         <input
-                          type="url"
-                          value={editingDev.website}
-                          onChange={(e) => setEditingDev({ ...editingDev, website: e.target.value })}
-                          placeholder="https://..."
-                          className="w-full rounded-2xl border border-white/10 bg-[rgba(15,20,28,0.7)] px-4 py-2.5 text-xs text-white outline-none focus:border-[#FF263D]/60"
+                          type="text"
+                          value={editingDev.headquarters}
+                          onChange={(e) =>
+                            setEditingDev({ ...editingDev, headquarters: e.target.value })
+                          }
+                          className="w-full rounded-xl border border-[#35151C] bg-[#1A0D10] p-2.5 text-xs text-white outline-none focus:border-[#FF263D]"
                         />
                       </div>
+
+                      <div className="md:col-span-2">
+                        <label className="block text-xs font-semibold text-[#A1A1AA] mb-1">
+                          Description
+                        </label>
+                        <textarea
+                          rows={2}
+                          value={editingDev.description}
+                          onChange={(e) =>
+                            setEditingDev({ ...editingDev, description: e.target.value })
+                          }
+                          className="w-full rounded-xl border border-[#35151C] bg-[#1A0D10] p-2.5 text-xs text-white outline-none focus:border-[#FF263D]"
+                        />
+                      </div>
+
+                      <div className="md:col-span-2 flex justify-end gap-3 pt-3 border-t border-[#35151C]">
+                        <button
+                          type="button"
+                          onClick={() => setEditingDev(null)}
+                          className="rounded-xl border border-[#35151C] px-4 py-2 text-xs font-semibold text-[#A1A1AA] hover:text-white"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={isSaving}
+                          className="rounded-xl bg-[#FF263D] hover:bg-[#FF4054] px-5 py-2 text-xs font-bold text-white transition"
+                        >
+                          {isSaving ? "Saving..." : "Save Partner Studio"}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ─── 9. ANNOUNCEMENTS ───────────────────────────────────────────── */}
+            {currentTab === "announcements" && (
+              <div className="space-y-6">
+                <div className="overflow-x-auto rounded-2xl border border-[#35151C] bg-[#130A0C]">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-[#35151C] bg-[#1A0D10]/50 text-[10px] font-mono text-[#A1A1AA] uppercase">
+                        <th className="py-3 px-4">Title</th>
+                        <th className="py-3 px-4">Category</th>
+                        <th className="py-3 px-4">Priority</th>
+                        <th className="py-3 px-4">Published</th>
+                        <th className="py-3 px-4">Status</th>
+                        <th className="py-3 px-4 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#35151C]/60 text-white">
+                      {announcements.map((ann) => (
+                        <tr key={ann.id} className="hover:bg-[#1A0D10]/60 transition-colors">
+                          <td className="py-3 px-4 font-semibold text-white">
+                            {ann.title}
+                          </td>
+                          <td className="py-3 px-4 text-[#A1A1AA] font-mono text-[10px]">
+                            {ann.category}
+                          </td>
+                          <td className="py-3 px-4">
+                            <span
+                              className={`rounded-md px-2 py-0.5 text-[9px] font-mono font-bold ${
+                                ann.priority === "HIGH" || ann.priority === "URGENT"
+                                  ? "border border-[#FF263D]/40 bg-[#FF263D]/10 text-[#FF4054]"
+                                  : "border border-[#35151C] text-[#A1A1AA]"
+                              }`}
+                            >
+                              {ann.priority}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 font-mono text-[#A1A1AA]">
+                            {new Date(ann.publishedAt).toLocaleDateString()}
+                          </td>
+                          <td className="py-3 px-4">
+                            <button
+                              onClick={() => handleToggleAnnouncement(ann.id)}
+                              className={`rounded-full px-2.5 py-0.5 text-[10px] font-mono font-bold transition cursor-pointer ${
+                                ann.isActive
+                                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
+                                  : "bg-[#1A0D10] text-[#A1A1AA] border border-[#35151C]"
+                              }`}
+                            >
+                              {ann.isActive ? "Active" : "Archived"}
+                            </button>
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <button
+                              onClick={() => handleDeleteAnnouncement(ann.id)}
+                              className="text-xs text-red-400 hover:text-red-300 cursor-pointer"
+                            >
+                              Delete
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Announcement Creation Modal */}
+                {showAnnouncementModal && (
+                  <div className="rounded-2xl border border-[#35151C] bg-[#130A0C] p-6 space-y-4">
+                    <div className="flex items-center justify-between pb-3 border-b border-[#35151C]">
+                      <h4 className="text-sm font-bold text-white">Broadcast New Announcement</h4>
+                      <button
+                        onClick={() => setShowAnnouncementModal(false)}
+                        className="text-[#A1A1AA] hover:text-white"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
                     </div>
 
-                    <div className="pt-2">
-                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <form onSubmit={handleCreateAnnouncement} className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-[#A1A1AA] mb-1">
+                          Headline
+                        </label>
                         <input
-                          type="checkbox"
-                          checked={editingDev.showInTicker}
-                          onChange={(e) => setEditingDev({ ...editingDev, showInTicker: e.target.checked })}
-                          className="h-4 w-4 rounded border-white/20 bg-white/5 accent-[#FF263D] cursor-pointer"
+                          type="text"
+                          required
+                          value={newAnnouncement.title}
+                          onChange={(e) =>
+                            setNewAnnouncement({ ...newAnnouncement, title: e.target.value })
+                          }
+                          placeholder="e.g. Kuronex Alpha Client v1.4.3 Released"
+                          className="w-full rounded-xl border border-[#35151C] bg-[#1A0D10] p-2.5 text-xs text-white outline-none focus:border-[#FF263D]"
                         />
-                        <span className="text-xs text-[#F5F5F5]">
-                          Display in continuous moving partner ticker strip
-                        </span>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-[#A1A1AA] mb-1">
+                          Message Body
+                        </label>
+                        <textarea
+                          rows={3}
+                          required
+                          value={newAnnouncement.message}
+                          onChange={(e) =>
+                            setNewAnnouncement({ ...newAnnouncement, message: e.target.value })
+                          }
+                          placeholder="Detailed announcement content..."
+                          className="w-full rounded-xl border border-[#35151C] bg-[#1A0D10] p-2.5 text-xs text-white outline-none focus:border-[#FF263D]"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-semibold text-[#A1A1AA] mb-1">
+                            Category
+                          </label>
+                          <select
+                            value={newAnnouncement.category}
+                            onChange={(e) =>
+                              setNewAnnouncement({
+                                ...newAnnouncement,
+                                category: e.target.value as Announcement["category"],
+                              })
+                            }
+                            className="w-full rounded-xl border border-[#35151C] bg-[#1A0D10] p-2.5 text-xs text-white outline-none focus:border-[#FF263D]"
+                          >
+                            <option value="UPDATE">UPDATE</option>
+                            <option value="MAINTENANCE">MAINTENANCE</option>
+                            <option value="COMMUNITY">COMMUNITY</option>
+                            <option value="PROMOTION">PROMOTION</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold text-[#A1A1AA] mb-1">
+                            Priority
+                          </label>
+                          <select
+                            value={newAnnouncement.priority}
+                            onChange={(e) =>
+                              setNewAnnouncement({
+                                ...newAnnouncement,
+                                priority: e.target.value as Announcement["priority"],
+                              })
+                            }
+                            className="w-full rounded-xl border border-[#35151C] bg-[#1A0D10] p-2.5 text-xs text-white outline-none focus:border-[#FF263D]"
+                          >
+                            <option value="LOW">LOW</option>
+                            <option value="NORMAL">NORMAL</option>
+                            <option value="HIGH">HIGH</option>
+                            <option value="URGENT">URGENT</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end gap-3 pt-3 border-t border-[#35151C]">
+                        <button
+                          type="button"
+                          onClick={() => setShowAnnouncementModal(false)}
+                          className="rounded-xl border border-[#35151C] px-4 py-2 text-xs font-semibold text-[#A1A1AA] hover:text-white"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={isSaving}
+                          className="rounded-xl bg-[#FF263D] hover:bg-[#FF4054] px-5 py-2 text-xs font-bold text-white transition"
+                        >
+                          {isSaving ? "Broadcasting..." : "Publish Broadcast"}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ─── 10. TEAM MANAGEMENT ───────────────────────────────────────── */}
+            {currentTab === "team" && (
+              <div className="space-y-6">
+                <div className="rounded-2xl border border-[#35151C] bg-[#130A0C] p-6 space-y-4">
+                  <h4 className="text-sm font-bold text-white mb-2">
+                    Authorized Administrative Operators
+                  </h4>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between p-3.5 rounded-xl border border-[#35151C] bg-[#1A0D10]">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#FF263D]/20 text-xs font-bold text-[#FF263D]">
+                          KD
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold text-white">kuronex_dev (You)</div>
+                          <div className="text-[10px] text-[#A1A1AA]">
+                            dev.admin@kuronex.internal • Root Key Holder
+                          </div>
+                        </div>
+                      </div>
+                      <span className="rounded-md border border-[#FF263D]/40 bg-[#FF263D]/10 px-2 py-0.5 text-[9px] font-mono font-bold text-[#FF263D]">
+                        SUPER ADMIN
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ─── 11. ROLES & PERMISSIONS MATRIX ────────────────────────────── */}
+            {currentTab === "roles" && (
+              <div className="space-y-6">
+                <div className="overflow-x-auto rounded-2xl border border-[#35151C] bg-[#130A0C]">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-[#35151C] bg-[#1A0D10]/50 text-[10px] font-mono text-[#A1A1AA] uppercase">
+                        <th className="py-3 px-4">Permission Scope</th>
+                        <th className="py-3 px-4 text-center">Player</th>
+                        <th className="py-3 px-4 text-center">Developer</th>
+                        <th className="py-3 px-4 text-center">Curator</th>
+                        <th className="py-3 px-4 text-center">Super Admin</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#35151C]/60 text-white">
+                      {[
+                        { scope: "Browse Catalog & Save Games", player: true, dev: true, curator: true, admin: true },
+                        { scope: "Submit Playtest Feedback", player: true, dev: true, curator: true, admin: true },
+                        { scope: "Publish Games to Developer Registry", player: false, dev: true, curator: true, admin: true },
+                        { scope: "Configure 3D Cartridge Slots", player: false, dev: false, curator: true, admin: true },
+                        { scope: "Broadcast Announcements", player: false, dev: false, curator: true, admin: true },
+                        { scope: "Manage User Roles & Delete Accounts", player: false, dev: false, curator: false, admin: true },
+                        { scope: "Modify Platform Passkeys & Core Config", player: false, dev: false, curator: false, admin: true },
+                      ].map((perm, idx) => (
+                        <tr key={idx} className="hover:bg-[#1A0D10]/60">
+                          <td className="py-3 px-4 font-semibold text-white">{perm.scope}</td>
+                          <td className="py-3 px-4 text-center">{perm.player ? "✓" : "—"}</td>
+                          <td className="py-3 px-4 text-center">{perm.dev ? "✓" : "—"}</td>
+                          <td className="py-3 px-4 text-center">{perm.curator ? "✓" : "—"}</td>
+                          <td className="py-3 px-4 text-center font-bold text-[#FF263D]">{perm.admin ? "✓" : "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* ─── 12. AUDIT LOGS ─────────────────────────────────────────────── */}
+            {currentTab === "audit" && (
+              <div className="space-y-6">
+                <div className="overflow-x-auto rounded-2xl border border-[#35151C] bg-[#130A0C]">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-[#35151C] bg-[#1A0D10]/50 text-[10px] font-mono text-[#A1A1AA] uppercase">
+                        <th className="py-3 px-4">Event ID</th>
+                        <th className="py-3 px-4">Action</th>
+                        <th className="py-3 px-4">Category</th>
+                        <th className="py-3 px-4">Actor</th>
+                        <th className="py-3 px-4">Target</th>
+                        <th className="py-3 px-4">Details</th>
+                        <th className="py-3 px-4 text-right">Timestamp</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#35151C]/60 text-white">
+                      {filteredLogs.map((log) => (
+                        <tr key={log.id} className="hover:bg-[#1A0D10]/60 transition-colors">
+                          <td className="py-3 px-4 font-mono text-[10px] text-[#A1A1AA]">
+                            {log.id}
+                          </td>
+                          <td className="py-3 px-4 font-semibold text-white">
+                            {log.action}
+                          </td>
+                          <td className="py-3 px-4 font-mono text-[10px] text-[#FF263D]">
+                            {log.category}
+                          </td>
+                          <td className="py-3 px-4 font-mono text-white">
+                            @{log.actor}
+                          </td>
+                          <td className="py-3 px-4 text-[#A1A1AA]">
+                            {log.target}
+                          </td>
+                          <td className="py-3 px-4 text-[#A1A1AA] max-w-sm truncate">
+                            {log.details}
+                          </td>
+                          <td className="py-3 px-4 text-right font-mono text-[10px] text-[#A1A1AA]">
+                            {new Date(log.timestamp).toLocaleString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* ─── 13. PLATFORM SETTINGS ──────────────────────────────────────── */}
+            {currentTab === "settings" && (
+              <div className="space-y-6">
+                <div className="rounded-2xl border border-[#35151C] bg-[#130A0C] p-6 space-y-6">
+                  <h4 className="text-sm font-bold text-white pb-3 border-b border-[#35151C]">
+                    Core Platform Runtime Parameters
+                  </h4>
+
+                  <form onSubmit={handleSaveSettings} className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div>
+                      <label className="block text-xs font-semibold text-[#A1A1AA] mb-1">
+                        Platform Name
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.platformName}
+                        onChange={(e) => setSettings({ ...settings, platformName: e.target.value })}
+                        className="w-full rounded-xl border border-[#35151C] bg-[#1A0D10] p-2.5 text-xs text-white outline-none focus:border-[#FF263D]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-[#A1A1AA] mb-1">
+                        Brand Tagline
+                      </label>
+                      <input
+                        type="text"
+                        value={settings.tagline}
+                        onChange={(e) => setSettings({ ...settings, tagline: e.target.value })}
+                        className="w-full rounded-xl border border-[#35151C] bg-[#1A0D10] p-2.5 text-xs text-white outline-none focus:border-[#FF263D]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-[#A1A1AA] mb-1">
+                        Support Contact Email
+                      </label>
+                      <input
+                        type="email"
+                        value={settings.supportEmail}
+                        onChange={(e) => setSettings({ ...settings, supportEmail: e.target.value })}
+                        className="w-full rounded-xl border border-[#35151C] bg-[#1A0D10] p-2.5 text-xs text-white outline-none focus:border-[#FF263D]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-[#A1A1AA] mb-1">
+                        Emergency Passkey
+                      </label>
+                      <input
+                        type="password"
+                        value={settings.adminPasskey}
+                        onChange={(e) => setSettings({ ...settings, adminPasskey: e.target.value })}
+                        className="w-full rounded-xl border border-[#35151C] bg-[#1A0D10] p-2.5 text-xs text-white outline-none focus:border-[#FF263D]"
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-3 p-3 rounded-xl border border-[#35151C] bg-[#1A0D10]">
+                      <input
+                        type="checkbox"
+                        id="maint-mode"
+                        checked={settings.maintenanceMode}
+                        onChange={(e) =>
+                          setSettings({ ...settings, maintenanceMode: e.target.checked })
+                        }
+                        className="h-4 w-4 rounded accent-[#FF263D] cursor-pointer"
+                      />
+                      <label htmlFor="maint-mode" className="text-xs text-white cursor-pointer select-none">
+                        Maintenance Mode (Lock non-admin access)
                       </label>
                     </div>
 
-                    <div className="pt-4 border-t border-white/10 flex items-center justify-end gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setEditingDev(null)}
-                        className="rounded-full border border-white/10 bg-white/5 px-5 py-2.5 text-xs text-[#8F9298] hover:text-white"
-                      >
-                        Cancel
-                      </button>
+                    <div className="flex items-center gap-3 p-3 rounded-xl border border-[#35151C] bg-[#1A0D10]">
+                      <input
+                        type="checkbox"
+                        id="reg-open"
+                        checked={settings.registrationOpen}
+                        onChange={(e) =>
+                          setSettings({ ...settings, registrationOpen: e.target.checked })
+                        }
+                        className="h-4 w-4 rounded accent-[#FF263D] cursor-pointer"
+                      />
+                      <label htmlFor="reg-open" className="text-xs text-white cursor-pointer select-none">
+                        Open Player Registration
+                      </label>
+                    </div>
+
+                    <div className="md:col-span-2 flex justify-end pt-3 border-t border-[#35151C]">
                       <button
                         type="submit"
                         disabled={isSaving}
-                        className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#FF4054] to-[#FF263D] px-6 py-2.5 text-xs font-bold text-white shadow-lg hover:brightness-110 disabled:opacity-50 cursor-pointer"
+                        className="rounded-xl bg-[#FF263D] hover:bg-[#FF4054] px-6 py-2.5 text-xs font-bold text-white transition cursor-pointer"
                       >
-                        <Save className="h-4 w-4" />
-                        <span>{isSaving ? "Saving..." : "Save Studio"}</span>
+                        {isSaving ? "Saving..." : "Save Configuration"}
                       </button>
                     </div>
                   </form>
                 </div>
               </div>
             )}
+          </main>
+        </div>
+
+        {/* Global Footer */}
+        <footer className="border-t border-[#35151C] bg-[#100607] py-4 px-6 text-center sm:text-left text-xs text-[#A1A1AA] flex flex-col sm:flex-row justify-between items-center gap-2">
+          <span>© 2026 KURONEX GAMES Inc. All rights reserved.</span>
+          <div className="flex items-center gap-4 text-[11px] font-mono">
+            <span>SECURE ROOT SESSION</span>
+            <span>•</span>
+            <span className="text-[#FF263D]">{settings.clientVersion}</span>
           </div>
-        )}
-      </main>
+        </footer>
+      </div>
     </div>
   );
 }

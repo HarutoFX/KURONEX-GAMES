@@ -1,0 +1,32 @@
+[
+  {
+    "id": "ann_01",
+    "title": "Kuronex Alpha Client v1.4.2 Deployed",
+    "message": "New direct-to-metal rendering backend enabled for Windows and Linux installations.",
+    "priority": "HIGH",
+    "category": "UPDATE",
+    "isActive": true,
+    "publishedAt": "2026-10-30T23:23:06.755Z",
+    "author": "kuronex_dev"
+  },
+  {
+    "id": "ann_02",
+    "title": "Global Playtest Weekend Commencing",
+    "message": "Servers for Voidstrike: Infinite and Neon Haven open for unrestricted stress testing.",
+    "priority": "NORMAL",
+    "category": "COMMUNITY",
+    "isActive": true,
+    "publishedAt": "2026-11-01T03:23:06.755Z",
+    "author": "kuronex_dev"
+  },
+  {
+    "id": "ann_03",
+    "title": "Scheduled Cloud Save Maintenance",
+    "message": "Database indexing scheduled for Tuesday at 03:00 UTC. Zero downtime anticipated.",
+    "priority": "LOW",
+    "category": "MAINTENANCE",
+    "isActive": false,
+    "publishedAt": "2026-10-29T11:23:06.755Z",
+    "author": "kuronex_dev"
+  }
+]
