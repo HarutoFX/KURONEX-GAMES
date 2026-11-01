@@ -21,6 +21,15 @@ export default function RegisterPage() {
   const router = useRouter();
   const { register, user } = useAuth();
 
+  const [accountType, setAccountType] = useState<"player" | "developer">(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("type") === "developer") {
+        return "developer";
+      }
+    }
+    return "player";
+  });
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -101,24 +110,35 @@ export default function RegisterPage() {
     }
 
     setIsSubmitting(true);
-    const result = await register(username.trim(), email.trim(), password);
+    const result = await register(username.trim(), email.trim(), password, accountType);
     setIsSubmitting(false);
 
     if (!result.success) {
       setErrorMessage(result.error || "Registration could not be completed. Please try again.");
     } else {
-      setSuccessMessage("Account created successfully! Initializing your player vault...");
-      setTimeout(() => {
-        router.push("/");
-      }, 1000);
+      if (accountType === "developer") {
+        setSuccessMessage("Developer account created! Redirecting to Studio Workspace...");
+        setTimeout(() => {
+          router.push("/developers");
+        }, 1000);
+      } else {
+        setSuccessMessage("Account created successfully! Initializing your player vault...");
+        setTimeout(() => {
+          router.push("/library");
+        }, 1000);
+      }
     }
   };
 
   return (
     <AuthLayout
-      sectionLabel="PLAYER REGISTRATION"
-      heading="Create your account."
-      subtitle="Build your identity. Discover games. Create your library."
+      sectionLabel={accountType === "developer" ? "DEVELOPER REGISTRATION" : "PLAYER REGISTRATION"}
+      heading={accountType === "developer" ? "Join Developer Program." : "Create your account."}
+      subtitle={
+        accountType === "developer"
+          ? "Access the Kuronex Studio Portal to submit games and configure client binary releases."
+          : "Join Kuronex to curate your personal vault and play on the upcoming desktop client."
+      }
       footerText="Already have an account?"
       footerLinkText="Sign in."
       footerLinkHref="/login"
@@ -165,6 +185,31 @@ export default function RegisterPage() {
 
       {/* Registration Form */}
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+        {/* Account Role Selector */}
+        <div className="rounded-2xl border border-white/10 bg-[#07080A] p-1.5 flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setAccountType("player")}
+            className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
+              accountType === "player"
+                ? "bg-[#FF263D] text-white shadow-md shadow-[#FF263D]/25"
+                : "text-[#929292] hover:text-white"
+            }`}
+          >
+            <span>🎮 Player Account</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setAccountType("developer")}
+            className={`flex-1 py-2 px-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer ${
+              accountType === "developer"
+                ? "bg-[#00E5FF] text-black shadow-md shadow-[#00E5FF]/25 font-extrabold"
+                : "text-[#929292] hover:text-white"
+            }`}
+          >
+            <span>💻 Developer Studio</span>
+          </button>
+        </div>
         {/* Gamertag Field */}
         <AuthInput
           id="register-username"

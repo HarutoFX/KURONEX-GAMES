@@ -14,6 +14,7 @@ export interface LibraryGameSlot {
   progressPercent: number;
   developer: string;
   isEmpty: boolean;
+  tags?: string[];
 }
 
 export interface DeveloperPartner {
@@ -28,6 +29,8 @@ export interface DeveloperPartner {
   partnerTier: "Premier Partner" | "Studio Partner" | "Indie Pioneer";
   website: string;
   showInTicker: boolean;
+  country?: string;
+  logo?: string;
 }
 
 const GAMES_FILE = path.join(process.cwd(), "src", "data", "library-games.json");

@@ -178,7 +178,7 @@ export function findUserById(id: string): User | undefined {
   return users.find((u) => u.id === id);
 }
 
-export function createUser(data: { username: string; email: string; password: string }): SafeUser {
+export function createUser(data: { username: string; email: string; password: string; role?: string }): SafeUser {
   const users = readUsers();
   const { hash, salt } = hashPassword(data.password);
 
@@ -189,7 +189,7 @@ export function createUser(data: { username: string; email: string; password: st
     passwordHash: hash,
     salt,
     createdAt: new Date().toISOString(),
-    role: "player",
+    role: data.role === "developer" ? "developer" : "player",
     library: [],
   };
 
