@@ -33,7 +33,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const saved = localStorage.getItem("kuronex_user_library");
       if (saved) {
-        setLibrary(JSON.parse(saved));
+        const parsed = JSON.parse(saved);
+        queueMicrotask(() => {
+          setLibrary(parsed);
+        });
       }
     } catch {
       // fallback
