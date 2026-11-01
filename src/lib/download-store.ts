@@ -109,3 +109,4 @@ export function getGameDownloadStats(): Record<string, number> {
   }
   return counts;
 }
+
