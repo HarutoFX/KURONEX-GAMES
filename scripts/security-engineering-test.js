@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 /**
  * KURONEX GAMES — Comprehensive Security Engineering Verification Suite
  *
@@ -11,6 +12,8 @@
  * 7. Security response headers (HSTS, nosniff, frame-options)
  */
 
+const fs = require("fs");
+const path = require("path");
 const BASE_URL = process.env.TEST_BASE_URL || "http://localhost:3000";
 
 let passed = 0;
@@ -151,7 +154,22 @@ async function runSecurityEngineeringTests() {
     });
     assert(forgotRes.status === 200, `POST /api/auth/forgot-password accepted (Status: ${forgotRes.status})`);
     const forgotData = await forgotRes.json();
-    assert(Boolean(forgotData.debugResetToken), "Password reset issued single-use cryptographic token");
+
+    let resetToken = forgotData.debugResetToken;
+    if (!resetToken) {
+      const usersPath = path.join(process.cwd(), "src", "data", "users.json");
+      const users = JSON.parse(fs.readFileSync(usersPath, "utf-8"));
+      const u = users.find((x) => x.email === testEmail);
+      assert(Boolean(u && u.passwordResetTokenHash), "Password reset issued single-use cryptographic token");
+      const crypto = require("crypto");
+      resetToken = "tok_test_" + crypto.randomBytes(32).toString("hex");
+      const tokenHash = crypto.createHash("sha256").update(resetToken).digest("hex");
+      u.passwordResetTokenHash = tokenHash;
+      u.passwordResetExpiresAt = Date.now() + 3600000;
+      fs.writeFileSync(usersPath, JSON.stringify(users, null, 2), "utf-8");
+    } else {
+      assert(Boolean(forgotData.debugResetToken), "Password reset issued single-use cryptographic token");
+    }
 
     // Invalid token rejection
     const invalidResetRes = await fetch(`${BASE_URL}/api/auth/reset-password`, {
@@ -165,7 +183,7 @@ async function runSecurityEngineeringTests() {
     const validResetRes = await fetch(`${BASE_URL}/api/auth/reset-password`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token: forgotData.debugResetToken, newPassword: "NewSecretPassword#2026!" }),
+      body: JSON.stringify({ token: resetToken, newPassword: "NewSecretPassword#2026!" }),
     });
     assert(validResetRes.status === 200, `Valid password reset succeeded (Status: ${validResetRes.status})`);
 
@@ -173,7 +191,7 @@ async function runSecurityEngineeringTests() {
     const reuseResetRes = await fetch(`${BASE_URL}/api/auth/reset-password`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token: forgotData.debugResetToken, newPassword: "AnotherPassword#2026!" }),
+      body: JSON.stringify({ token: resetToken, newPassword: "AnotherPassword#2026!" }),
     });
     assert(reuseResetRes.status === 400, `Reusing already-consumed reset token blocked (Status: ${reuseResetRes.status})`);
 

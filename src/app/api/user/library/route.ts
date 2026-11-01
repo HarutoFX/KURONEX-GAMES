@@ -66,3 +66,36 @@ export async function POST(req: NextRequest) {
   }
 }
 
+export async function DELETE(req: NextRequest) {
+  try {
+    const user = await getSessionUser(req);
+    if (!user) {
+      return NextResponse.json({ error: "Authentication required to manage persistent library" }, { status: 401 });
+    }
+
+    const body = await req.json().catch(() => ({}));
+    const { gameId } = body;
+
+    if (!gameId || typeof gameId !== "string") {
+      return NextResponse.json({ error: "Valid gameId is required" }, { status: 400 });
+    }
+
+    const sanitizedGameId = gameId.trim().replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64);
+    const updatedLibrary = updateUserLibrary(user.id, sanitizedGameId, "remove");
+
+    trackEvent({
+      eventType: "library.game_removed",
+      category: "engagement",
+      userId: user.id,
+      resourceId: sanitizedGameId,
+      metadata: { action: "removed" },
+    });
+
+    return NextResponse.json({ success: true, library: updatedLibrary }, { status: 200 });
+  } catch (error) {
+    console.error("Delete user library item error:", error);
+    return NextResponse.json({ error: "Failed to remove from library" }, { status: 500 });
+  }
+}
+
+

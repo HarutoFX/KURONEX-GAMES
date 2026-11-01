@@ -30,3 +30,4 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Failed to calculate analytics summary" }, { status: 500 });
   }
 }
+

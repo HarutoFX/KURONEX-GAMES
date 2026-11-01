@@ -161,3 +161,4 @@ export interface OperationalAlert {
   isActive: boolean;
   deliveryStatus: "LOGGED" | "WEBHOOK_DISPATCHED" | "WEBHOOK_NOT_CONFIGURED";
 }
+

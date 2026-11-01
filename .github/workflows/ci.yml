@@ -1,0 +1,76 @@
+name: KURONEX Quality Engineering & CI Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - Haruto-code
+      - arish-code
+  pull_request:
+    branches:
+      - main
+      - Haruto-code
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality-gate:
+    name: Code Quality, Verification & Production Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    strategy:
+      matrix:
+        node-version: [20.x, 22.x]
+
+    steps:
+      - name: 1. Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: 2. Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: "npm"
+
+      - name: 3. Install Dependencies
+        run: npm ci --prefer-offline || npm install
+
+      - name: 4. Static TypeScript Verification
+        run: npm run typecheck
+
+      - name: 5. Code Style & ESLint
+        run: npm run lint
+
+      - name: 6. Unit Test Suite Execution
+        run: npm run test:unit
+
+      - name: 7. Next.js Production Build
+        run: npm run build
+        env:
+          NODE_ENV: production
+          NEXT_TELEMETRY_DISABLED: 1
+
+      - name: 8. Start Background Production Server for Integration Testing
+        run: |
+          npm run start &
+          npx wait-on http://localhost:3000/api/health --timeout 30000
+        env:
+          NODE_ENV: production
+          PORT: 3000
+
+      - name: 9. Comprehensive Integration, E2E & Observability Verification
+        run: node scripts/run-all-tests.js
+        env:
+          TEST_BASE_URL: http://localhost:3000
+          NODE_ENV: production
+
+      - name: 10. Pipeline Status Summary
+        if: always()
+        run: |
+          echo "### Quality Gate Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Node Version**: ${{ matrix.node-version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Result**: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY

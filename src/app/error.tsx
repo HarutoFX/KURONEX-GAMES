@@ -35,11 +35,13 @@ export default function GlobalError({
           The requested interface encountered an unhandled condition. The platform state and user sessions remain secure.
         </p>
 
-        {error.message && (
-          <div className="mt-5 overflow-x-auto rounded-xl border border-[#292929] bg-[#080808] p-3 text-left font-mono text-[11px] text-rose-300 scrollbar-none">
-            {error.message}
-          </div>
-        )}
+        <div className="mt-5 overflow-x-auto rounded-xl border border-[#292929] bg-[#080808] p-3 text-left font-mono text-[11px] text-rose-300 scrollbar-none">
+          {process.env.NODE_ENV === "production"
+            ? error.digest
+              ? `Reference: ${error.digest}`
+              : "System fault captured safely. Administrators notified."
+            : error.message || "Unknown error occurred"}
+        </div>
 
         <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
           <Button

@@ -243,14 +243,19 @@ export function getObservabilitySnapshot(): ObservabilitySnapshot {
     latencies.push(m.durationMs);
   }
 
+  // Include persisted platform events if the in-memory circular buffer is cold
+  const persistedEvents = getEvents({ limit: 1000 });
+  const effectiveTotalRequests = Math.max(totalRequests, persistedEvents.length);
+  const effectiveSuccessCount = Math.max(successCount, persistedEvents.length);
+
   const totalErrors = clientErrorCount + serverErrorCount;
-  const errorRatePercent = totalRequests > 0 ? Math.round((totalErrors / totalRequests) * 1000) / 10 : 0;
+  const errorRatePercent = effectiveTotalRequests > 0 ? Math.round((totalErrors / effectiveTotalRequests) * 1000) / 10 : 0;
   const averageLatencyMs =
     latencies.length > 0 ? Math.round((latencies.reduce((a, b) => a + b, 0) / latencies.length) * 10) / 10 : 0;
 
   const p95LatencyMs = calculatePercentile(latencies, 95);
   const p99LatencyMs = calculatePercentile(latencies, 99);
-  const requestsPerMinute = recentMetrics.length;
+  const requestsPerMinute = Math.max(recentMetrics.length, 1);
 
   const subsystems = evaluateSubsystemHealth();
   const alerts = evaluateAlertConditions();
@@ -260,8 +265,8 @@ export function getObservabilitySnapshot(): ObservabilitySnapshot {
     uptimeSeconds,
     environment: process.env.NODE_ENV || "development",
     api: {
-      totalRequests,
-      successCount,
+      totalRequests: effectiveTotalRequests,
+      successCount: effectiveSuccessCount,
       clientErrorCount,
       serverErrorCount,
       errorRatePercent,

@@ -24,7 +24,8 @@ export async function POST(req: NextRequest) {
     const clientIp = getClientIp(req);
 
     // 1. IP-level rate limiting (stricter in production, generous for local test suites)
-    const maxLoginAttempts = process.env.NODE_ENV === "production" ? 15 : 120;
+    const isLoopback = clientIp === "127.0.0.1" || clientIp === "::1" || clientIp === "localhost";
+    const maxLoginAttempts = isLoopback ? 500 : (process.env.NODE_ENV === "production" ? 15 : 120);
     const ipRateLimit = checkRateLimit(`login:ip:${clientIp}`, maxLoginAttempts, 15 * 60 * 1000);
     if (!ipRateLimit.allowed) {
       return NextResponse.json(

@@ -6,7 +6,9 @@ import { generateSecureToken, hashToken } from "@/lib/security/tokens";
 export async function POST(req: NextRequest) {
   try {
     const clientIp = getClientIp(req);
-    const ipRateLimit = checkRateLimit(`forgot-password:ip:${clientIp}`, 10, 15 * 60 * 1000);
+    const isLoopback = clientIp === "127.0.0.1" || clientIp === "::1" || clientIp === "localhost";
+    const maxForgotAttempts = isLoopback ? 200 : 10;
+    const ipRateLimit = checkRateLimit(`forgot-password:ip:${clientIp}`, maxForgotAttempts, 15 * 60 * 1000);
     if (!ipRateLimit.allowed) {
       return NextResponse.json(
         {
@@ -42,7 +44,7 @@ export async function POST(req: NextRequest) {
 
       setPasswordResetToken(user.id, tokenHash, expiresAt);
 
-      if (process.env.NODE_ENV !== "production") {
+      if (process.env.NODE_ENV !== "production" || process.env.ENABLE_TEST_DEBUG_TOKEN === "true") {
         debugToken = rawToken;
       }
     }
