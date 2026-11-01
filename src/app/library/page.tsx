@@ -380,8 +380,8 @@ export default function LibraryPage() {
 
                 <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4 text-left space-y-2">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="flex items-center gap-1.5 text-emerald-400 font-semibold">
-                      <CheckCircle2 className="h-3.5 w-3.5" /> Platform Verified
+                    <span className="flex items-center gap-1.5 text-[#FF4054] font-semibold">
+                      <CheckCircle2 className="h-3.5 w-3.5" /> Platform Curated
                     </span>
                     <span className="font-mono text-[#FF4054] font-bold">{selectedGame.progressPercent}% Ready</span>
                   </div>

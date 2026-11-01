@@ -65,6 +65,14 @@ export default function AdminPage() {
     maxUploadSizeMb: 120,
     featuredCategory: "Action",
   });
+  const [metrics, setMetrics] = useState<{
+    totalUsers: number;
+    activeUsers: number;
+    totalGames: number;
+    totalDownloads: number;
+    platformDownloads?: { windows: number; macos: number; linux: number; other: number; total: number };
+    gameLibraryStats?: Record<string, number>;
+  } | null>(null);
 
   // UI Feedback
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
@@ -137,6 +145,7 @@ export default function AdminPage() {
         if (sData.logs) setAuditLogs(sData.logs);
         if (sData.announcements) setAnnouncements(sData.announcements);
         if (sData.settings) setSettings(sData.settings);
+        if (sData.metrics) setMetrics(sData.metrics);
       }
     } catch (err) {
       console.error("Failed to load admin data:", err);
@@ -754,37 +763,25 @@ export default function AdminPage() {
                     title="Total Registered Players"
                     value={usersList.length.toLocaleString()}
                     icon={Users}
-                    change="+18.4%"
-                    changeType="positive"
-                    caption="vs previous 30d"
-                    sparklineData={[3, 5, 4, 8, 9, 12, usersList.length]}
+                    caption="registered player accounts"
                   />
                   <MetricCard
                     title="Active Sessions"
-                    value={Math.max(usersList.filter((u) => u.role === "admin").length, 1)}
+                    value={metrics ? metrics.activeUsers : (usersList.length > 0 ? 1 : 0)}
                     icon={Activity}
-                    change="+12.0%"
-                    changeType="positive"
-                    caption="live connections"
-                    sparklineData={[1, 1, 2, 2, 3, 2, 4]}
+                    caption="live authenticated connections"
                   />
                   <MetricCard
                     title="Catalog Titles"
                     value={GAMES_DATA.length + games.filter((g) => !g.isEmpty).length}
                     icon={Gamepad2}
-                    change="+4 titles"
-                    changeType="positive"
-                    caption="active production builds"
-                    sparklineData={[4, 5, 5, 6, 7, 8, 9]}
+                    caption="active catalogue releases"
                   />
                   <MetricCard
                     title="Client Downloads"
-                    value={(1420 + usersList.length * 12).toLocaleString()}
+                    value={(metrics?.totalDownloads ?? 0).toLocaleString()}
                     icon={Download}
-                    change="+24.6%"
-                    changeType="positive"
                     caption="direct client installations"
-                    sparklineData={[800, 920, 1050, 1200, 1340, 1420]}
                   />
                 </div>
 
@@ -804,6 +801,7 @@ export default function AdminPage() {
                     <AnalyticsChart />
                     <TopGamesTable
                       games={filteredCatalogGames}
+                      gameStats={metrics?.gameLibraryStats || {}}
                       onSelectGame={() => {
                         setCurrentTab("games");
                       }}
@@ -825,18 +823,19 @@ export default function AdminPage() {
                       Category Distribution
                     </h4>
                     <div className="space-y-3">
-                      {CATEGORIES.map((cat, idx) => {
-                        const count = games.filter((g) => g.category === cat && !g.isEmpty).length + (idx === 0 ? 3 : 1);
-                        const pct = Math.min(Math.round((count / 12) * 100), 100);
+                      {CATEGORIES.map((cat) => {
+                        const count = games.filter((g) => g.category === cat && !g.isEmpty).length;
+                        const total = games.filter((g) => !g.isEmpty).length || 1;
+                        const pct = Math.round((count / total) * 100);
                         return (
                           <div key={cat} className="space-y-1">
                             <div className="flex justify-between text-xs">
                               <span className="text-white">{cat}</span>
-                              <span className="text-[#A1A1AA] font-mono">{count} games ({pct}%)</span>
+                              <span className="text-[#A1A1AA] font-mono">{count} titles ({pct}%)</span>
                             </div>
                             <div className="h-1.5 w-full bg-[#1A0D10] rounded-full overflow-hidden">
                               <div
-                                className="h-full bg-[#FF263D] rounded-full"
+                                className="h-full bg-[#FF263D] rounded-full transition-all duration-300"
                                 style={{ width: `${pct}%` }}
                               />
                             </div>
@@ -851,24 +850,36 @@ export default function AdminPage() {
                       Operating System Share
                     </h4>
                     <div className="space-y-3">
-                      {[
-                        { os: "Windows (x64 / ARM64)", pct: 68 },
-                        { os: "Linux (Proton / Native)", pct: 19 },
-                        { os: "macOS (Apple Silicon)", pct: 13 },
-                      ].map((item) => (
-                        <div key={item.os} className="space-y-1">
-                          <div className="flex justify-between text-xs">
-                            <span className="text-white">{item.os}</span>
-                            <span className="text-[#A1A1AA] font-mono">{item.pct}%</span>
+                      {(() => {
+                        const dl = metrics?.platformDownloads;
+                        const totalDl = dl?.total || 0;
+                        if (!dl || totalDl === 0) {
+                          return (
+                            <div className="py-6 text-center text-xs text-[#A1A1AA] font-mono">
+                              No download activity recorded yet.
+                            </div>
+                          );
+                        }
+                        const osList = [
+                          { os: "Windows (x64 / ARM64)", count: dl.windows, pct: Math.round((dl.windows / totalDl) * 100) },
+                          { os: "Linux (Proton / Native)", count: dl.linux, pct: Math.round((dl.linux / totalDl) * 100) },
+                          { os: "macOS (Apple Silicon)", count: dl.macos, pct: Math.round((dl.macos / totalDl) * 100) },
+                        ];
+                        return osList.map((item) => (
+                          <div key={item.os} className="space-y-1">
+                            <div className="flex justify-between text-xs">
+                              <span className="text-white">{item.os}</span>
+                              <span className="text-[#A1A1AA] font-mono">{item.count} downloads ({item.pct}%)</span>
+                            </div>
+                            <div className="h-1.5 w-full bg-[#1A0D10] rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-emerald-400 rounded-full transition-all duration-300"
+                                style={{ width: `${item.pct}%` }}
+                              />
+                            </div>
                           </div>
-                          <div className="h-1.5 w-full bg-[#1A0D10] rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-emerald-400 rounded-full"
-                              style={{ width: `${item.pct}%` }}
-                            />
-                          </div>
-                        </div>
-                      ))}
+                        ));
+                      })()}
                     </div>
                   </div>
 
@@ -878,16 +889,16 @@ export default function AdminPage() {
                     </h4>
                     <div className="space-y-3 text-xs">
                       <div className="flex justify-between p-2.5 rounded-xl border border-[#35151C] bg-[#1A0D10]">
-                        <span className="text-[#A1A1AA]">Sync Success Rate</span>
-                        <span className="font-mono font-bold text-emerald-400">99.98%</span>
+                        <span className="text-[#A1A1AA]">Sync Engine</span>
+                        <span className="font-mono font-bold text-zinc-400">Not Configured</span>
                       </div>
                       <div className="flex justify-between p-2.5 rounded-xl border border-[#35151C] bg-[#1A0D10]">
-                        <span className="text-[#A1A1AA]">Average Save Size</span>
-                        <span className="font-mono font-bold text-white">4.2 MB</span>
+                        <span className="text-[#A1A1AA]">Cloud Replication</span>
+                        <span className="font-mono font-bold text-[#A1A1AA]">Local saves only</span>
                       </div>
                       <div className="flex justify-between p-2.5 rounded-xl border border-[#35151C] bg-[#1A0D10]">
-                        <span className="text-[#A1A1AA]">Cloud Replication Lag</span>
-                        <span className="font-mono font-bold text-[#FF263D]">&lt; 85 ms</span>
+                        <span className="text-[#A1A1AA]">Remote Storage Provider</span>
+                        <span className="font-mono font-bold text-zinc-500">Unbound</span>
                       </div>
                     </div>
                   </div>
@@ -906,8 +917,8 @@ export default function AdminPage() {
                         <th className="py-3 px-4">Title</th>
                         <th className="py-3 px-4">Genre / Category</th>
                         <th className="py-3 px-4">Developer</th>
-                        <th className="py-3 px-4">Rating</th>
-                        <th className="py-3 px-4">Active Players</th>
+                        <th className="py-3 px-4">User Rating</th>
+                        <th className="py-3 px-4">Library Adds</th>
                         <th className="py-3 px-4">Phase</th>
                         <th className="py-3 px-4 text-right">Actions</th>
                       </tr>
@@ -927,11 +938,11 @@ export default function AdminPage() {
                           <td className="py-3 px-4 text-[#A1A1AA]">
                             {game.developer}
                           </td>
-                          <td className="py-3 px-4 font-mono text-amber-400">
-                            ★ {game.rating}
+                          <td className="py-3 px-4 font-mono text-[#A1A1AA]">
+                            No reviews yet
                           </td>
                           <td className="py-3 px-4 font-mono">
-                            {game.playerCount}
+                            {metrics?.gameLibraryStats?.[game.id] || 0} players
                           </td>
                           <td className="py-3 px-4">
                             <span className="rounded-md border border-[#35151C] bg-[#1A0D10] px-2 py-0.5 text-[10px] font-mono">
@@ -1279,8 +1290,8 @@ export default function AdminPage() {
                       Control automated key distribution drops for waitlist players.
                     </p>
                     <div className="pt-2">
-                      <span className="inline-block rounded-md border border-[#FF263D]/40 bg-[#FF263D]/10 px-3 py-1 text-xs font-mono font-bold text-[#FF4054]">
-                        2,500 / 5,000 Keys Claimed
+                      <span className="inline-block rounded-md border border-zinc-500/30 bg-zinc-500/10 px-3 py-1 text-xs font-mono font-bold text-zinc-300">
+                        0 Keys Claimed • Playtest Distribution Pending
                       </span>
                     </div>
                   </div>

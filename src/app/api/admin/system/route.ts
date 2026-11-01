@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdmin, getActiveSessionCount, getGameLibraryStats } from "@/lib/auth";
+import { getTotalDownloadCount, getPlatformDownloadStats } from "@/lib/download-store";
 import {
   getAuditLogs,
   getAnnouncements,
@@ -48,11 +49,18 @@ export async function GET(req: NextRequest) {
     const librarySlots = getLibraryGames();
     const developers = getDevelopers();
 
+    const totalDownloads = getTotalDownloadCount();
+    const platformDownloads = getPlatformDownloadStats();
+    const gameLibraryStats = getGameLibraryStats();
+    const activeSessions = getActiveSessionCount();
+
     const metrics = {
       totalUsers: users.length,
-      activeUsers: Math.max(users.filter((u) => u.role === "admin").length, 1),
+      activeUsers: activeSessions,
       totalGames: GAMES_DATA.length + librarySlots.filter((s) => !s.isEmpty).length,
-      totalDownloads: 1420 + users.length * 12,
+      totalDownloads,
+      platformDownloads,
+      gameLibraryStats,
       totalSlots: librarySlots.length,
       filledSlots: librarySlots.filter((s) => !s.isEmpty).length,
       developersCount: developers.length,

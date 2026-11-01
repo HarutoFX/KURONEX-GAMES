@@ -12,6 +12,7 @@ export interface User {
   salt: string;
   createdAt: string;
   role: "player" | "developer" | "admin";
+  library?: string[];
 }
 
 export interface SafeUser {
@@ -20,6 +21,7 @@ export interface SafeUser {
   email: string;
   createdAt: string;
   role: "player" | "developer" | "admin";
+  library: string[];
 }
 
 export interface Session {
@@ -144,6 +146,7 @@ export function toSafeUser(user: User): SafeUser {
     email: user.email,
     createdAt: user.createdAt,
     role: user.role,
+    library: Array.isArray(user.library) ? user.library : [],
   };
 }
 
@@ -174,11 +177,62 @@ export function createUser(data: { username: string; email: string; password: st
     salt,
     createdAt: new Date().toISOString(),
     role: "player",
+    library: [],
   };
 
   users.push(newUser);
   writeUsers(users);
   return toSafeUser(newUser);
+}
+
+export function getUserLibrary(userId: string): string[] {
+  const user = findUserById(userId);
+  return Array.isArray(user?.library) ? user.library : [];
+}
+
+export function updateUserLibrary(
+  userId: string,
+  gameId: string,
+  action: "add" | "remove" | "toggle" = "toggle"
+): string[] {
+  const users = readUsers();
+  const user = users.find((u) => u.id === userId);
+  if (!user) return [];
+
+  const current = Array.isArray(user.library) ? [...user.library] : [];
+  let updated: string[];
+
+  if (action === "add") {
+    updated = current.includes(gameId) ? current : [...current, gameId];
+  } else if (action === "remove") {
+    updated = current.filter((id) => id !== gameId);
+  } else {
+    // toggle
+    updated = current.includes(gameId) ? current.filter((id) => id !== gameId) : [...current, gameId];
+  }
+
+  user.library = updated;
+  writeUsers(users);
+  return updated;
+}
+
+export function getActiveSessionCount(): number {
+  const sessions = readSessions();
+  const now = Date.now();
+  return sessions.filter((s) => s.expiresAt > now).length;
+}
+
+export function getGameLibraryStats(): Record<string, number> {
+  const users = readUsers();
+  const counts: Record<string, number> = {};
+  for (const user of users) {
+    if (Array.isArray(user.library)) {
+      for (const gameId of user.library) {
+        counts[gameId] = (counts[gameId] || 0) + 1;
+      }
+    }
+  }
+  return counts;
 }
 
 // ─── Session Management ─────────────────────────────────────────────────────

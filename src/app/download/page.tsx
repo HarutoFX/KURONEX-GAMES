@@ -40,10 +40,23 @@ export default function DownloadPage() {
 
   const isAdmin = user?.role === "admin";
 
-  const handleNotifySubmit = (e: React.FormEvent) => {
+  const handleNotifySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (emailInput.trim()) {
       setIsNotified(true);
+      try {
+        await fetch("/api/downloads", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            itemType: "client",
+            itemId: "kuronex-launcher-preview",
+            platform: selectedOS,
+          }),
+        });
+      } catch {
+        // ignore
+      }
     }
   };
 

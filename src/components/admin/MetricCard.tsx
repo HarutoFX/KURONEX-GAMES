@@ -19,19 +19,22 @@ export function MetricCard({
   icon: Icon,
   change,
   changeType = "positive",
-  caption = "vs previous cycle",
-  sparklineData = [12, 18, 15, 24, 21, 28, 35],
+  caption,
+  sparklineData,
 }: MetricCardProps) {
-  // SVG Sparkline calculation
-  const max = Math.max(...sparklineData, 1);
-  const min = Math.min(...sparklineData, 0);
-  const points = sparklineData
-    .map((val, idx) => {
-      const x = (idx / (sparklineData.length - 1)) * 100;
-      const y = 30 - ((val - min) / (max - min || 1)) * 24;
-      return `${x},${y}`;
-    })
-    .join(" ");
+  // SVG Sparkline calculation (only when authentic time-series points exist)
+  const hasSparkline = Array.isArray(sparklineData) && sparklineData.length >= 2;
+  const max = hasSparkline ? Math.max(...sparklineData, 1) : 1;
+  const min = hasSparkline ? Math.min(...sparklineData, 0) : 0;
+  const points = hasSparkline
+    ? sparklineData
+        .map((val, idx) => {
+          const x = (idx / (sparklineData.length - 1)) * 100;
+          const y = 30 - ((val - min) / (max - min || 1)) * 24;
+          return `${x},${y}`;
+        })
+        .join(" ")
+    : "";
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-[#35151C] bg-[#130A0C] p-4 sm:p-5 transition-all duration-200 hover:border-[#FF263D]/40 hover:shadow-[0_4px_24px_rgba(255,38,61,0.08)]">
@@ -76,19 +79,21 @@ export function MetricCard({
           )}
         </div>
 
-        {/* Micro Sparkline */}
-        <div className="w-20 sm:w-24 h-8 shrink-0">
-          <svg className="w-full h-full overflow-visible" viewBox="0 0 100 32">
-            <polyline
-              fill="none"
-              stroke="#FF263D"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              points={points}
-            />
-          </svg>
-        </div>
+        {/* Micro Sparkline (only if authentic data exists) */}
+        {hasSparkline && (
+          <div className="w-20 sm:w-24 h-8 shrink-0">
+            <svg className="w-full h-full overflow-visible" viewBox="0 0 100 32">
+              <polyline
+                fill="none"
+                stroke="#FF263D"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                points={points}
+              />
+            </svg>
+          </div>
+        )}
       </div>
     </div>
   );

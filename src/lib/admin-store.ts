@@ -53,58 +53,17 @@ function ensureFile(filePath: string, defaultContent: string) {
 }
 
 // ─── AUDIT LOGS ─────────────────────────────────────────────────────────────
-const DEFAULT_LOGS: AuditLog[] = [
-  {
-    id: "log_01",
-    action: "System Initialization",
-    category: "SYSTEM",
-    actor: "kuronex_dev",
-    target: "Kuronex Core Engine",
-    details: "Platform control system booted with encrypted session management.",
-    timestamp: new Date(Date.now() - 3600000 * 24).toISOString(),
-    status: "SUCCESS",
-  },
-  {
-    id: "log_02",
-    action: "Catalog Sync",
-    category: "GAMES",
-    actor: "kuronex_dev",
-    target: "KX-01 Neon Haven",
-    details: "Updated cartridge asset pipeline and live server cluster status.",
-    timestamp: new Date(Date.now() - 3600000 * 12).toISOString(),
-    status: "SUCCESS",
-  },
-  {
-    id: "log_03",
-    action: "Developer Studio Registered",
-    category: "CMS",
-    actor: "kuronex_dev",
-    target: "CyberForge Dynamics",
-    details: "Approved studio onboarding into premier partner directory.",
-    timestamp: new Date(Date.now() - 3600000 * 4).toISOString(),
-    status: "SUCCESS",
-  },
-  {
-    id: "log_04",
-    action: "Admin Account Verified",
-    category: "AUTH",
-    actor: "kuronex_dev",
-    target: "kuronex_dev",
-    details: "Root developer privileges authenticated via security gateway.",
-    timestamp: new Date(Date.now() - 1800000).toISOString(),
-    status: "SUCCESS",
-  },
-];
-
 export function getAuditLogs(): AuditLog[] {
   try {
-    ensureFile(AUDIT_FILE, JSON.stringify(DEFAULT_LOGS, null, 2));
+    ensureFile(AUDIT_FILE, "[]");
     const data = fs.readFileSync(AUDIT_FILE, "utf-8");
     const logs = JSON.parse(data || "[]");
-    return logs.sort((a: AuditLog, b: AuditLog) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    return Array.isArray(logs)
+      ? logs.sort((a: AuditLog, b: AuditLog) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      : [];
   } catch (error) {
     console.error("Failed to read audit logs:", error);
-    return DEFAULT_LOGS;
+    return [];
   }
 }
 

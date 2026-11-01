@@ -27,16 +27,18 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<SafeUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [library, setLibrary] = useState<string[]>(["neon-haven", "voidstrike"]);
+  const [library, setLibrary] = useState<string[]>([]);
 
   useEffect(() => {
     try {
       const saved = localStorage.getItem("kuronex_user_library");
       if (saved) {
         const parsed = JSON.parse(saved);
-        queueMicrotask(() => {
-          setLibrary(parsed);
-        });
+        if (Array.isArray(parsed)) {
+          queueMicrotask(() => {
+            setLibrary(parsed);
+          });
+        }
       }
     } catch {
       // fallback
@@ -53,6 +55,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch {
         // ignore
       }
+
+      // If authenticated, persist server-side
+      if (user) {
+        fetch("/api/user/library", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ gameId, action: "toggle" }),
+        }).catch((err) => {
+          console.error("Failed to sync library to server:", err);
+        });
+      }
+
       return next;
     });
   };
@@ -65,6 +79,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (res.ok) {
         const data = await res.json();
         setUser(data.user || null);
+        if (data.user && Array.isArray(data.user.library)) {
+          setLibrary(data.user.library);
+          try {
+            localStorage.setItem("kuronex_user_library", JSON.stringify(data.user.library));
+          } catch {
+            // ignore
+          }
+        }
       } else {
         setUser(null);
       }
@@ -83,7 +105,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const res = await fetch("/api/auth/me", { cache: "no-store" });
         if (res.ok) {
           const data = await res.json();
-          if (!ignore) setUser(data.user || null);
+          if (!ignore) {
+            setUser(data.user || null);
+            if (data.user && Array.isArray(data.user.library)) {
+              setLibrary(data.user.library);
+              try {
+                localStorage.setItem("kuronex_user_library", JSON.stringify(data.user.library));
+              } catch {
+                // ignore
+              }
+            }
+          }
         } else {
           if (!ignore) setUser(null);
         }
@@ -114,6 +146,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       setUser(data.user);
+      if (data.user && Array.isArray(data.user.library)) {
+        setLibrary(data.user.library);
+        try {
+          localStorage.setItem("kuronex_user_library", JSON.stringify(data.user.library));
+        } catch {
+          // ignore
+        }
+      }
       return { success: true };
     } catch {
       return { success: false, error: "Network error. Please try again." };
@@ -134,6 +174,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       setUser(data.user);
+      setLibrary([]);
+      try {
+        localStorage.setItem("kuronex_user_library", "[]");
+      } catch {
+        // ignore
+      }
       return { success: true };
     } catch {
       return { success: false, error: "Network error. Please try again." };
@@ -147,6 +193,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error("Logout request failed:", err);
     } finally {
       setUser(null);
+      setLibrary([]);
+      try {
+        localStorage.removeItem("kuronex_user_library");
+      } catch {
+        // ignore
+      }
     }
   };
 
