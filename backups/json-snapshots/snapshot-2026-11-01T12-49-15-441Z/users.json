@@ -1,0 +1,32 @@
+[
+  {
+    "id": "kuro_dev_admin_root",
+    "username": "kuronex_dev",
+    "email": "dev.admin@kuronex.internal",
+    "passwordHash": "5b1fa48a2e194215636d4da3d7eb33f54399d5cbdec1872e63bc661fd66a84c73f233a3dac9d95a502186da32bab9f2745446089c3243506b05e62ff197d105e",
+    "salt": "fed36537de0885b55dfda6ed8ce6f7da",
+    "createdAt": "2026-11-01T00:00:00.000Z",
+    "role": "admin",
+    "library": []
+  },
+  {
+    "id": "vyo_f1714adeee1911e4",
+    "username": "test1",
+    "email": "test1@test.com",
+    "passwordHash": "c6fb54f691ccc7353cd7409421c56b9176dd5fb2b5027b653bbe3eee4777dc500136483d265291e32c54e3b347e47365e321ebd8c7d97f960a766925157a1a35",
+    "salt": "f8139299bfc740f89b8d9080f54f21cd",
+    "createdAt": "2026-10-07T13:44:42.258Z",
+    "role": "admin",
+    "library": []
+  },
+  {
+    "id": "vyo_2bc6070a18a0467a",
+    "username": "test2",
+    "email": "test2@games.com",
+    "passwordHash": "a0ea0c6c573cd58703292c312230f61e421d70a4fa593daddff921d085069a52bea41a502afcb39ba81bf8dc1718dc7b4c6d84df7cfd3fec53dec2ccf1f0937e",
+    "salt": "189275375573c793f147b7080567c8b0",
+    "createdAt": "2026-10-09T07:58:29.783Z",
+    "role": "player",
+    "library": []
+  }
+]

@@ -7,15 +7,28 @@ import {
   getGameDownloadStats,
 } from "@/lib/download-store";
 import { getSessionUser } from "@/lib/auth";
+import { parsePagination } from "@/lib/api/validators";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const limit = parseInt(searchParams.get("limit") || "50", 10);
+    const { page, limit } = parsePagination(searchParams, 50, 200);
+    const platform = searchParams.get("platform");
+    const itemType = searchParams.get("itemType");
 
-    const events = getDownloadEvents().slice(0, limit);
+    let allEvents = getDownloadEvents();
+    if (platform && ["windows", "macos", "linux", "other"].includes(platform)) {
+      allEvents = allEvents.filter((e) => e.platform === platform);
+    }
+    if (itemType && (itemType === "client" || itemType === "game")) {
+      allEvents = allEvents.filter((e) => e.itemType === itemType);
+    }
+
+    const startIndex = (page - 1) * limit;
+    const pagedEvents = allEvents.slice(startIndex, startIndex + limit);
+
     const total = getTotalDownloadCount();
     const platformStats = getPlatformDownloadStats();
     const gameStats = getGameDownloadStats();
@@ -25,7 +38,13 @@ export async function GET(req: NextRequest) {
         total,
         platformStats,
         gameStats,
-        events,
+        events: pagedEvents,
+        pagination: {
+          page,
+          limit,
+          totalCount: allEvents.length,
+          totalPages: Math.ceil(allEvents.length / limit) || 1,
+        },
       },
       { status: 200 }
     );

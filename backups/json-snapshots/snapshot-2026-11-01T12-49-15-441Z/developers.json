@@ -1,0 +1,107 @@
+[
+  {
+    "id": "dev-01",
+    "name": "Kuronex Studios",
+    "tagline": "Architects of Cyberpunk Universes",
+    "icon": "Sparkles",
+    "genre": "Action RPG / Cyberpunk",
+    "headquarters": "Tokyo, Japan",
+    "description": "Dedicated to pushing real-time rendering, fluid animation systems, and immersive narrative combat mechanics.",
+    "gamesCount": 3,
+    "partnerTier": "Premier Partner",
+    "website": "https://kuronex.games",
+    "showInTicker": true
+  },
+  {
+    "id": "dev-02",
+    "name": "Aether Dynamics",
+    "tagline": "Zero-G Physics & Space Flight",
+    "icon": "Compass",
+    "genre": "Space Simulation Roguelite",
+    "headquarters": "Stockholm, Sweden",
+    "description": "Pioneering procedural quantum flight engines, atmospheric re-entry shaders, and dynamic orbital physics.",
+    "gamesCount": 2,
+    "partnerTier": "Premier Partner",
+    "website": "https://aetherdynamics.io",
+    "showInTicker": true
+  },
+  {
+    "id": "dev-03",
+    "name": "Shadowfall Works",
+    "tagline": "Dark Fantasy & Atmospheric Souls-likes",
+    "icon": "ShieldCheck",
+    "genre": "Dark Fantasy RPG",
+    "headquarters": "Edinburgh, UK",
+    "description": "Crafting punishing combat encounters, intricate gothic architecture, and deeply layered environmental lore.",
+    "gamesCount": 2,
+    "partnerTier": "Studio Partner",
+    "website": "https://shadowfall.dev",
+    "showInTicker": true
+  },
+  {
+    "id": "dev-04",
+    "name": "SubZero Interactive",
+    "tagline": "Extreme Biome Survival Specialists",
+    "icon": "Flame",
+    "genre": "Survival RPG",
+    "headquarters": "Oslo, Norway",
+    "description": "Pushing thermal thermodynamics, procedural blizzards, and granular outpost management systems.",
+    "gamesCount": 1,
+    "partnerTier": "Studio Partner",
+    "website": "https://subzero.games",
+    "showInTicker": true
+  },
+  {
+    "id": "dev-05",
+    "name": "NeuroForge Lab",
+    "tagline": "Cognitive AI & Neural Stealth",
+    "icon": "Cpu",
+    "genre": "Tactical Stealth Strategy",
+    "headquarters": "Austin, USA",
+    "description": "Blending psychological thriller themes with systemic stealth gameplay and advanced NPC decision trees.",
+    "gamesCount": 1,
+    "partnerTier": "Indie Pioneer",
+    "website": "https://neuroforge.ai",
+    "showInTicker": true
+  },
+  {
+    "id": "dev-06",
+    "name": "Verdant Horizon",
+    "tagline": "Ecosystem Symbiosis & Bioluminescence",
+    "icon": "Trees",
+    "genre": "Atmospheric Nature Exploration",
+    "headquarters": "Vancouver, Canada",
+    "description": "Crafting visually enchanting alien biomes celebrating natural balance, celestial mystery, and relaxing puzzles.",
+    "gamesCount": 2,
+    "partnerTier": "Indie Pioneer",
+    "website": "https://verdanthorizon.co",
+    "showInTicker": true
+  },
+  {
+    "id": "dev-07",
+    "name": "Ironclad Collective",
+    "tagline": "Titan Mech Combat & Heavy Artillery",
+    "icon": "Layers",
+    "genre": "Mech Action Simulator",
+    "headquarters": "Seoul, South Korea",
+    "description": "Hard-surface mechanical engineering with thunderous kinetic physics and tactical modular upgrades.",
+    "gamesCount": 1,
+    "partnerTier": "Studio Partner",
+    "website": "https://ironclad.gg",
+    "showInTicker": true
+  },
+  {
+    "id": "dev-08",
+    "name": "Singularity Media",
+    "tagline": "Time-Dilation & Narrative Mechanics",
+    "icon": "Zap",
+    "genre": "Sci-Fi Puzzle Adventure",
+    "headquarters": "Berlin, Germany",
+    "description": "Award-winning story architects weaving multi-timeline causal puzzles and high-fidelity temporal paradoxes.",
+    "gamesCount": 1,
+    "partnerTier": "Indie Pioneer",
+    "website": "https://singularity.media",
+    "showInTicker": true
+  }
+]
+

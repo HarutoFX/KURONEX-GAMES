@@ -1,5 +1,5 @@
-import fs from "fs";
 import path from "path";
+import { atomicWriteJsonSync, safeReadJsonSync } from "@/lib/db/atomic-store";
 
 export interface DownloadEvent {
   id: string;
@@ -21,28 +21,11 @@ export interface PlatformDownloadStats {
 
 const DOWNLOADS_FILE = path.join(process.cwd(), "src", "data", "downloads.json");
 
-function ensureFile(filePath: string, defaultContent: string) {
-  const dir = path.dirname(filePath);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  if (!fs.existsSync(filePath)) {
-    fs.writeFileSync(filePath, defaultContent, "utf-8");
-  }
-}
-
 export function getDownloadEvents(): DownloadEvent[] {
-  try {
-    ensureFile(DOWNLOADS_FILE, "[]");
-    const data = fs.readFileSync(DOWNLOADS_FILE, "utf-8");
-    const events: DownloadEvent[] = JSON.parse(data || "[]");
-    return Array.isArray(events)
-      ? events.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-      : [];
-  } catch (error) {
-    console.error("Failed to read downloads:", error);
-    return [];
-  }
+  const events = safeReadJsonSync<DownloadEvent[]>(DOWNLOADS_FILE, []);
+  return Array.isArray(events)
+    ? events.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+    : [];
 }
 
 export function recordDownloadEvent(params: {
@@ -66,8 +49,7 @@ export function recordDownloadEvent(params: {
   events.unshift(newEvent);
 
   try {
-    ensureFile(DOWNLOADS_FILE, "[]");
-    fs.writeFileSync(DOWNLOADS_FILE, JSON.stringify(events, null, 2), "utf-8");
+    atomicWriteJsonSync(DOWNLOADS_FILE, events);
   } catch (error) {
     console.error("Failed to persist download event:", error);
   }

@@ -1,0 +1,45 @@
+{
+  "snapshotTimestamp": "2026-11-01T12:49:15.444Z",
+  "files": {
+    "users.json": {
+      "bytes": 1171,
+      "sha256": "ee999d4bec2cf25759a540d5ee16c81c845787053248750216a9c0d3b559cb89",
+      "recordCount": 3
+    },
+    "sessions.json": {
+      "bytes": 3,
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+      "recordCount": 0
+    },
+    "library-games.json": {
+      "bytes": 7544,
+      "sha256": "33cf0000b365dd73f0b63a7f70754111d470a97b805c7c57cc8d4540a9db58dd",
+      "recordCount": 21
+    },
+    "developers.json": {
+      "bytes": 3718,
+      "sha256": "58d2eb46d1017c48e1cf4f3c3fa464953c906351bfe056f3f0d9a593e5ac8824",
+      "recordCount": 8
+    },
+    "downloads.json": {
+      "bytes": 3,
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+      "recordCount": 0
+    },
+    "announcements.json": {
+      "bytes": 997,
+      "sha256": "dba021d81db94cdd259fe6c70613771ba2f8d3044c65b74d63d5ecac46d0f944",
+      "recordCount": 3
+    },
+    "audit-logs.json": {
+      "bytes": 2420,
+      "sha256": "3f50e678b31888623ae246ecc2c0be8240f479858ebb3aebdecece7f48fa90a7",
+      "recordCount": 8
+    },
+    "platform-settings.json": {
+      "bytes": 325,
+      "sha256": "a1a62872a062b4ec11b587dadd35e566795a88c86b2395414c8f40dfd8baf1fa",
+      "recordCount": 1
+    }
+  }
+}

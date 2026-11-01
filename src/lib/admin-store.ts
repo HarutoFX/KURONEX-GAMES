@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { User, SafeUser, toSafeUser } from "./auth";
+import { atomicWriteJsonSync } from "./db/atomic-store";
 
 export interface AuditLog {
   id: string;
@@ -88,8 +89,7 @@ export function logAdminAction(
   };
   logs.unshift(newLog);
   try {
-    ensureFile(AUDIT_FILE, "[]");
-    fs.writeFileSync(AUDIT_FILE, JSON.stringify(logs.slice(0, 100), null, 2), "utf-8");
+    atomicWriteJsonSync(AUDIT_FILE, logs.slice(0, 500));
   } catch (error) {
     console.error("Failed to write audit log:", error);
   }
@@ -143,8 +143,7 @@ export function getAnnouncements(): Announcement[] {
 
 export function saveAnnouncements(announcements: Announcement[]): boolean {
   try {
-    ensureFile(ANNOUNCEMENTS_FILE, "[]");
-    fs.writeFileSync(ANNOUNCEMENTS_FILE, JSON.stringify(announcements, null, 2), "utf-8");
+    atomicWriteJsonSync(ANNOUNCEMENTS_FILE, announcements);
     return true;
   } catch (error) {
     console.error("Failed to write announcements:", error);
@@ -217,8 +216,7 @@ export function savePlatformSettings(newSettings: Partial<PlatformSettings>, act
   const current = getPlatformSettings();
   const updated = { ...current, ...newSettings };
   try {
-    ensureFile(SETTINGS_FILE, "[]");
-    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(updated, null, 2), "utf-8");
+    atomicWriteJsonSync(SETTINGS_FILE, updated);
     logAdminAction("Update Settings", "SETTINGS", "Platform Configuration", "Saved updated system parameters.", actor);
   } catch (error) {
     console.error("Failed to write settings:", error);
@@ -253,7 +251,7 @@ export function updateUserRole(userId: string, newRole: "player" | "developer" |
     }
 
     target.role = newRole;
-    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), "utf-8");
+    atomicWriteJsonSync(USERS_FILE, users);
     logAdminAction("Updated User Role", "USERS", target.username, `Role changed to ${newRole} by ${actor}`, actor);
     return true;
   } catch (error) {
@@ -273,7 +271,7 @@ export function deleteUser(userId: string, actor = "system"): boolean {
     const filtered = users.filter((u) => u.id !== userId);
 
     if (filtered.length !== users.length) {
-      fs.writeFileSync(USERS_FILE, JSON.stringify(filtered, null, 2), "utf-8");
+      atomicWriteJsonSync(USERS_FILE, filtered);
       logAdminAction("Deleted User Account", "USERS", target?.username || userId, `Removed account permanently by ${actor}`, actor);
       return true;
     }

@@ -3,6 +3,7 @@ import path from "path";
 import crypto from "crypto";
 import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
+import { atomicWriteJsonSync } from "./db/atomic-store";
 
 export interface User {
   id: string;
@@ -102,8 +103,7 @@ function readUsers(): User[] {
 }
 
 function writeUsers(users: User[]) {
-  ensureFile(DB_FILE, "[]");
-  fs.writeFileSync(DB_FILE, JSON.stringify(users, null, 2), "utf-8");
+  atomicWriteJsonSync(DB_FILE, users);
 }
 
 function readSessions(): Session[] {
@@ -118,8 +118,7 @@ function readSessions(): Session[] {
 }
 
 function writeSessions(sessions: Session[]) {
-  ensureFile(SESSIONS_FILE, "[]");
-  fs.writeFileSync(SESSIONS_FILE, JSON.stringify(sessions, null, 2), "utf-8");
+  atomicWriteJsonSync(SESSIONS_FILE, sessions);
 }
 
 // ─── Password Cryptography ──────────────────────────────────────────────────
