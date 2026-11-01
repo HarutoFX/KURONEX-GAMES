@@ -122,3 +122,4 @@ export function CursorFollower() {
 }
 
 export default CursorFollower;
+
