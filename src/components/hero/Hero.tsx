@@ -8,7 +8,7 @@ import { SiteNavbar } from "@/components/ui/navigation";
 
 export function HeroTitle() {
   return (
-    <h1 className="text-6xl font-bold tracking-[-0.055em] leading-[0.88] md:text-7xl lg:text-8xl">
+    <h1 className="text-6xl font-bold tracking-[-0.055em] leading-[0.96] md:text-7xl lg:text-8xl pb-2">
       <GradientText as="span">
         Build Your
         <br />

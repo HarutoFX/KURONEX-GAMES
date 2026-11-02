@@ -101,7 +101,7 @@ export const GradientText = memo(function GradientText({
   return (
     <Component
       className={cn(
-        "inline-block bg-clip-text text-transparent select-auto",
+        "inline-block bg-clip-text text-transparent select-auto pb-[0.25em] -mb-[0.25em] px-[0.05em]",
         animate && "animate-kuronex-gradient",
         className
       )}
