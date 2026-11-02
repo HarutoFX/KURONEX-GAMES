@@ -16,7 +16,22 @@ export function atomicWriteJsonSync(filePath: string, data: unknown): void {
 
   try {
     fs.writeFileSync(tempPath, content, "utf-8");
-    fs.renameSync(tempPath, filePath);
+    try {
+      fs.renameSync(tempPath, filePath);
+    } catch (renameError: unknown) {
+      const err = renameError as { code?: string };
+      if (err?.code === "EPERM" || err?.code === "EBUSY" || err?.code === "EACCES") {
+        // Windows file-lock fallback (e.g., when file is open in an IDE or scanned by antivirus)
+        fs.copyFileSync(tempPath, filePath);
+        try {
+          fs.unlinkSync(tempPath);
+        } catch {
+          // ignore temp cleanup error
+        }
+      } else {
+        throw renameError;
+      }
+    }
   } catch (error) {
     if (fs.existsSync(tempPath)) {
       try {

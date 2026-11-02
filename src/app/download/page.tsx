@@ -10,7 +10,7 @@ import {
   Copy,
   Ticket,
 } from "lucide-react";
-import { AuroraText } from "@/registry/magicui/aurora-text";
+import { GradientText } from "@/components/ui/gradient-text";
 import { SiteNavbar, SiteFooter } from "@/components/ui/navigation";
 import { Button } from "@/components/ui/button";
 import { downloadsService } from "@/services/downloads.service";
@@ -64,7 +64,7 @@ export default function DownloadPage() {
             STANDALONE CLIENT APP • ALPHA RELEASE
           </div>
           <h1 className="text-4xl sm:text-6xl md:text-7xl font-extrabold tracking-tight text-[#FFFFFF] leading-tight">
-            <AuroraText>Download Kuronex App.</AuroraText>
+            <GradientText as="span">Download Kuronex App.</GradientText>
           </h1>
           <p className="mt-4 text-base sm:text-lg text-[#929292] leading-relaxed max-w-2xl mx-auto">
             Experience the next-generation game library application. Engineered from the ground up

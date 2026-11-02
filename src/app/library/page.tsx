@@ -17,7 +17,7 @@ import {
   Check,
   Plus,
 } from "lucide-react";
-import { AuroraText } from "@/registry/magicui/aurora-text";
+import { GradientText } from "@/components/ui/gradient-text";
 import { useAuth } from "@/context/AuthContext";
 import { LibraryGameSlot } from "@/lib/library-store";
 import { LargeLibraryCard } from "@/components/library/LargeLibraryCard";
@@ -146,7 +146,7 @@ export default function LibraryPage() {
               CURATED CATEGORY VAULTS
             </div>
             <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight text-[#FFFFFF]">
-              <AuroraText>Platform Library.</AuroraText>
+              <GradientText as="span">Platform Library.</GradientText>
             </h1>
             <p className="mt-3 max-w-2xl text-sm sm:text-base text-[#929292] leading-relaxed">
               Explore 2-4 flagship titles and upcoming releases per category. All cartridges support direct

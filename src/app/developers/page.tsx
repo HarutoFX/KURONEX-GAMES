@@ -12,7 +12,7 @@ import {
   Sparkles,
   Code2,
 } from "lucide-react";
-import { AuroraText } from "@/registry/magicui/aurora-text";
+import { GradientText } from "@/components/ui/gradient-text";
 import { DeveloperMarquee } from "@/components/developers/DeveloperMarquee";
 import { DeveloperPartner } from "@/lib/library-store";
 import { SiteNavbar, SiteFooter } from "@/components/ui/navigation";
@@ -250,7 +250,7 @@ export default function DevelopersPage() {
                 STUDIO NETWORK & CREATOR ECOSYSTEM
               </div>
               <h1 className="text-4xl sm:text-6xl md:text-7xl font-extrabold tracking-tight text-[#FFFFFF] leading-tight">
-                <AuroraText>Our Partner Studios.</AuroraText>
+                <GradientText as="span">Our Partner Studios.</GradientText>
               </h1>
               <p className="mt-4 text-base sm:text-lg text-[#929292] leading-relaxed max-w-2xl mx-auto">
                 Meet the innovative game companies, independent teams, and craft studios shaping

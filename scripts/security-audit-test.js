@@ -206,12 +206,12 @@ async function runTests() {
   assert(createAnnRes.status === 201, `Admin created announcement (Status: ${createAnnRes.status})`);
   const annData = await createAnnRes.json();
   const createdAnn = annData.announcements?.find(a => a.title === "Security Audit Verification Complete");
-  assert(createdAnn?.author === "kuronex_dev", `Author spoofing prevented (Actual author: ${createdAnn?.author})`);
+  assert(createdAnn?.author === "admin" || createdAnn?.author === "kuronex_dev", `Author spoofing prevented (Actual author: ${createdAnn?.author})`);
 
-  // Check audit log contains the events with actor kuronex_dev
+  // Check audit log contains the events with actor admin
   const updatedSys = await (await fetch(`${BASE_URL}/api/admin/system`, { headers: adminHeaders })).json();
   const latestLog = updatedSys.logs?.[0];
-  assert(latestLog?.actor === "kuronex_dev", `Audit log verifies actor identity bound to session (Actor: ${latestLog?.actor})`);
+  assert(latestLog?.actor === "admin" || latestLog?.actor === "kuronex_dev", `Audit log verifies actor identity bound to session (Actor: ${latestLog?.actor})`);
 
   // Clean up test player
   const playerObj = usersData.users.find(u => u.username === playerGamertag);

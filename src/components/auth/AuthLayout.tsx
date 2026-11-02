@@ -3,8 +3,8 @@
 import React from "react";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
-import { ParticleBackground } from "./ParticleBackground";
 import { MagicCard } from "@/components/ui/magic-card";
+import { GradientText } from "@/components/ui/gradient-text";
 
 interface AuthLayoutProps {
   children: React.ReactNode;
@@ -28,10 +28,7 @@ export function AuthLayout({
   footerLinkHref,
 }: AuthLayoutProps) {
   return (
-    <div className="relative min-h-screen w-full bg-[#080808] text-[#FFFFFF] antialiased flex flex-col justify-between selection:bg-[#FF263D]/30 selection:text-white">
-      {/* ─── Interactive Particle Background ─────────────────────────────── */}
-      <ParticleBackground />
-
+    <div className="relative min-h-screen w-full bg-transparent text-[#FFFFFF] antialiased flex flex-col justify-between selection:bg-[#FF263D]/30 selection:text-white">
       {/* ─── Top Header Navigation ────────────────────────────────────────── */}
       <header className="relative z-10 w-full max-w-5xl mx-auto px-4 sm:px-6 pt-6 sm:pt-8 flex items-center justify-between">
         <Link
@@ -105,7 +102,7 @@ export function AuthLayout({
 
             {/* Main Heading */}
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#FFFFFF]">
-              {heading}
+              <GradientText as="span">{heading}</GradientText>
             </h1>
 
             {/* Subtitle */}

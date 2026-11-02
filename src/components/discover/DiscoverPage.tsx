@@ -9,7 +9,7 @@ import {
   ArrowRight,
   Check,
 } from "lucide-react";
-import { AuroraText } from "@/registry/magicui/aurora-text";
+import { GradientText } from "@/components/ui/gradient-text";
 import { DeveloperMarquee } from "@/components/developers/DeveloperMarquee";
 import { DeveloperPartner } from "@/lib/library-store";
 import { SiteNavbar, SiteFooter } from "@/components/ui/navigation";
@@ -56,7 +56,7 @@ export function DiscoverPage({ hideNavbar = false }: { hideNavbar?: boolean }) {
             INTRO & VISION // KURONEX GAMES
           </div>
           <h1 className="text-4xl sm:text-6xl md:text-7xl font-extrabold tracking-tight text-[#FFFFFF] leading-tight">
-            <AuroraText>Our Mission & Goal.</AuroraText>
+            <GradientText as="span">Our Mission & Goal.</GradientText>
           </h1>
           <p className="mt-4 text-base sm:text-lg text-[#929292] leading-relaxed max-w-2xl mx-auto">
             We are building Kuronex to free players and game creators from bloated, memory-hogging launchers.
@@ -86,8 +86,8 @@ export function DiscoverPage({ hideNavbar = false }: { hideNavbar?: boolean }) {
             </p>
           </div>
 
-          <div className="rounded-2xl border border-[#292929] bg-[#111111]/85 p-8 backdrop-blur-2xl transition duration-300 hover:border-[#A855F7]/40 hover:shadow-[0_0_35px_rgba(168,85,247,0.12)]">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-[#A855F7]/40 bg-[#A855F7]/10 text-[#A855F7]">
+          <div className="rounded-2xl border border-[#292929] bg-[#111111]/85 p-8 backdrop-blur-2xl transition duration-300 hover:border-[#00D1FF]/40 hover:shadow-[0_0_35px_rgba(0,209,255,0.12)]">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-[#00D1FF]/40 bg-[#00D1FF]/10 text-[#00D1FF]">
               <ShieldCheck className="h-6 w-6" />
             </div>
             <h3 className="mt-6 text-xl font-bold text-white">Player-First Library</h3>

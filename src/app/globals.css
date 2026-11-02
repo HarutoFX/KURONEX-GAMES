@@ -111,15 +111,6 @@ a {
   background: transparent;
 }
 
-/* Subtle atmosphere layer — keeps center clear so dots shine at full luminosity */
-.hero-atmosphere {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  pointer-events: none;
-  background: radial-gradient(ellipse at 50% 50%, transparent 60%, rgba(2, 4, 5, 0.45) 100%);
-}
-
 /* =========================================
    NAVIGATION
 ========================================= */
@@ -332,6 +323,25 @@ a {
   font-weight: 700;
 }
 
+@keyframes kuronexGradient {
+  0% {
+    background-position: 0% 50%;
+  }
+
+  50% {
+    background-position: 100% 50%;
+  }
+
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.animate-kuronex-gradient {
+  animation: kuronexGradient 8s ease-in-out infinite;
+  will-change: background-position;
+}
+
 @keyframes aurora {
   0% {
     background-position: 0% 50%;
@@ -347,7 +357,16 @@ a {
 }
 
 .animate-aurora {
-  animation: aurora 3s ease-in-out infinite alternate;
+  animation: kuronexGradient 8s ease-in-out infinite;
+  will-change: background-position;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-kuronex-gradient,
+  .animate-aurora {
+    animation: none !important;
+    background-position: 50% 50% !important;
+  }
 }
 
 @keyframes marquee {
@@ -590,8 +609,6 @@ a {
     opacity: 0;
   }
 }
-
-/* hero-glow removed in favor of DotGridShader */
 
 /* =========================================
    RESPONSIVE

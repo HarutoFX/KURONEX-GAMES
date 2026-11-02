@@ -11,6 +11,7 @@ import {
   X,
 } from "lucide-react";
 import { Announcement } from "@/lib/admin-store";
+import { GradientText } from "@/components/ui/gradient-text";
 
 interface AdminHeaderProps {
   searchQuery: string;
@@ -188,7 +189,7 @@ export function AdminHeader({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-t border-[#35151C]/60 px-4 sm:px-6 lg:px-8 py-4">
         <div>
           <h1 className="text-lg sm:text-xl font-bold tracking-tight text-[#FFFFFF]">
-            {title}
+            <GradientText as="span" variant="subtle">{title}</GradientText>
           </h1>
           <p className="text-xs text-[#A1A1AA] mt-0.5">
             {subtitle}

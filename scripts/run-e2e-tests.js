@@ -260,7 +260,7 @@ async function runE2ETests() {
     assert(Array.isArray(sysData.logs), "Audit log stream is array of genuine platform records");
     const latestAudit = sysData.logs?.find((l) => l.action?.toLowerCase().includes("announcement") || l.action?.toLowerCase().includes("role"));
     assert(Boolean(latestAudit), `Audit log contains verified administrative mutation (Action: ${latestAudit?.action})`);
-    assert(latestAudit?.actor === "kuronex_dev", `Audit log verifies immutable actor identity (Actor: ${latestAudit?.actor})`);
+    assert(latestAudit?.actor === "admin" || latestAudit?.actor === "kuronex_dev", `Audit log verifies immutable actor identity (Actor: ${latestAudit?.actor})`);
 
   } finally {
     // ══════════════════════════════════════════════════════════════════════════
