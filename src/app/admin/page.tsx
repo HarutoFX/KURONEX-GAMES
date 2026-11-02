@@ -408,7 +408,7 @@ export default function AdminPage() {
   // ─── AUTH / PERMISSION GATE ─────────────────────────────────────────────────
   if (isLoading) {
     return (
-      <main className="min-h-screen bg-[#080808] flex items-center justify-center p-4">
+      <main className="min-h-screen bg-transparent flex items-center justify-center p-4">
         <div className="flex flex-col items-center gap-3">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#FF263D] border-t-transparent" />
           <span className="font-mono text-xs text-[#A1A1AA] tracking-widest uppercase">
@@ -421,7 +421,7 @@ export default function AdminPage() {
 
   if (!isAuthenticated) {
     return (
-      <main className="min-h-screen bg-[#080808] flex items-center justify-center p-4">
+      <main className="min-h-screen bg-transparent flex items-center justify-center p-4">
         <div className="w-full max-w-md rounded-3xl border border-[#35151C] bg-[#130A0C] p-8 text-center shadow-2xl space-y-6">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-[#FF263D]/40 bg-[#FF263D]/10 text-[#FF263D]">
             <Shield className="h-7 w-7" />
@@ -566,7 +566,7 @@ export default function AdminPage() {
   const headerInfo = getTabHeader();
 
   return (
-    <div className="min-h-screen bg-[#080808] text-[#FFFFFF] antialiased selection:bg-[#FF263D]/30 selection:text-white">
+    <div className="min-h-screen bg-transparent text-[#FFFFFF] antialiased selection:bg-[#FF263D]/30 selection:text-white">
       {/* Toast Alert Notification */}
       {toast && (
         <div

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
-import { KuronexBackground } from "@/components/background/KuronexBackground";
+import { SpotlightBackground } from "@/components/background";
 import { CursorFollower } from "@/components/ui/cursor-follower";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
@@ -45,11 +45,11 @@ export default function RootLayout({
         {/* Sleek GPU-accelerated cyber cursor follower */}
         <CursorFollower />
         {/*
-          KuronexBackground is position:fixed, z-index:0, pointer-events:none.
-          It sits behind all page content on every route.
+          SpotlightBackground is position:fixed, z-index:0, pointer-events:none.
+          It sits behind all page content on every route with route-specific intensity.
           Mounted once here — never duplicated per-page.
         */}
-        <KuronexBackground />
+        <SpotlightBackground />
         {/*
           Page content sits above the background via relative positioning.
           All pages must have a transparent (or semi-transparent) background

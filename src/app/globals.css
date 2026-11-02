@@ -111,15 +111,6 @@ a {
   background: transparent;
 }
 
-/* Subtle atmosphere layer — keeps center clear so dots shine at full luminosity */
-.hero-atmosphere {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  pointer-events: none;
-  background: radial-gradient(ellipse at 50% 50%, transparent 60%, rgba(2, 4, 5, 0.45) 100%);
-}
-
 /* =========================================
    NAVIGATION
 ========================================= */
@@ -590,8 +581,6 @@ a {
     opacity: 0;
   }
 }
-
-/* hero-glow removed in favor of DotGridShader */
 
 /* =========================================
    RESPONSIVE
