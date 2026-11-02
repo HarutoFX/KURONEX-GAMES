@@ -53,18 +53,19 @@ export const SPOTLIGHT_CONFIG: SpotlightSystemConfig = {
 
   // ── Primary Spotlight: Electric Cyan #00D1FF ────────────────────────────────
   // Dominant cinematic beam shining from upper-right down-left across the hero
+  // Localized cone with steep exponential falloff towards center and bottom
   primaryBeam: {
     id: "beam-cyan",
     name: "Primary Electric Cyan",
     color: [0.0, 0.8196, 1.0], // #00D1FF
-    origin: [1.12, 1.12],      // Upper-right corner outside viewport
-    baseAngle: -2.45,          // ~ -140 degrees (down-left towards center)
-    spread: 0.58,              // Broad cinematic theatrical cone
-    baseRadius: 0.16,          // Soft luminous source
-    intensity: 0.90,           // Dominant ambient lighting
-    decay: 0.38,               // Smooth distance falloff
-    oscillationSpeed: 0.32,    // Slow breathing
-    swayAmplitude: 0.07,       // Subtle organic sway
+    origin: [1.06, 1.10],      // Upper-right corner just outside viewport
+    baseAngle: -2.38,          // ~ -136 degrees (down-left towards hero headline)
+    spread: 0.34,              // Focused theatrical cone (~19.5 deg)
+    baseRadius: 0.09,          // Controlled luminous source
+    intensity: 0.78,           // Dominant spotlight illumination
+    decay: 0.75,               // Steep falloff: drops cleanly into #080808 before lower screen
+    oscillationSpeed: 0.28,    // Gentle breathing
+    swayAmplitude: 0.045,      // Subtle organic sway
   },
 
   // ── Secondary Spotlight: KURONEX Red #FF263D ────────────────────────────────
@@ -73,52 +74,53 @@ export const SPOTLIGHT_CONFIG: SpotlightSystemConfig = {
     id: "beam-red",
     name: "Secondary KURONEX Red",
     color: [1.0, 0.149, 0.2392], // #FF263D
-    origin: [-0.10, 0.95],       // Upper-left corner outside viewport
-    baseAngle: -0.55,            // ~ -31 degrees (down-right towards center)
-    spread: 0.50,                // Soft cone
-    baseRadius: 0.14,            // Soft source
-    intensity: 0.55,             // Restrained crimson illumination
-    decay: 0.45,                 // Fades cleanly into deep void
-    oscillationSpeed: 0.40,      // Slow harmonic
-    swayAmplitude: 0.06,         // Controlled sway
+    origin: [-0.06, 1.04],       // Upper-left corner just outside viewport
+    baseAngle: -0.60,            // ~ -34 degrees (down-right towards hero title)
+    spread: 0.28,                // Narrow theatrical cone (~16 deg)
+    baseRadius: 0.07,            // Subtle luminous source
+    intensity: 0.42,             // Restrained crimson illumination
+    decay: 0.85,                 // Fades cleanly into deep void before opposite side
+    oscillationSpeed: 0.34,      // Slow harmonic
+    swayAmplitude: 0.040,        // Controlled sway
   },
 
   // ── Ambient Counter-Glow: Deep Cyan Wash ─────────────────────────────────────
-  // Soft ambient ground light to prevent deep shadows from feeling dead
+  // Kept extremely minimal to preserve deep black (#080808) across the viewport
   ambientBeam: {
     id: "beam-ambient-cyan",
     name: "Ambient Deep Cyan",
-    color: [0.0, 0.28, 0.40],   // Deep teal/cyan wash
-    origin: [0.50, -0.15],      // Center-bottom
-    baseAngle: 1.57,            // Points straight up (~90 degrees)
-    spread: 1.10,               // Very wide diffuse wash
-    baseRadius: 0.30,           // Broad soft source
-    intensity: 0.20,            // Subtle ambient fill
-    decay: 0.85,                // Fades out before top
-    oscillationSpeed: 0.25,     // Gentle drift
-    swayAmplitude: 0.05,        // Minimal sway
+    color: [0.0, 0.20, 0.28],   // Deep muted teal
+    origin: [0.50, -0.20],      // Off-canvas bottom
+    baseAngle: 1.57,            // Straight up
+    spread: 0.60,               // Contained cone
+    baseRadius: 0.10,           // Small source
+    intensity: 0.02,            // Subdued to near-zero to prevent bottom wash
+    decay: 1.80,                // Drops off immediately
+    oscillationSpeed: 0.20,     // Gentle drift
+    swayAmplitude: 0.03,        // Minimal sway
   },
 
   // ── Page-Specific Intensity Table ───────────────────────────────────────────
+  // Visual tuning targets per specification
   routeIntensities: {
-    "/": 1.0,           // Homepage: 100%
-    "/discover": 0.55,  // Discover: 55%
-    "/library": 0.45,   // Library: 45%
-    "/developers": 0.50,// Developers: 50%
-    "/login": 0.65,     // Login: 65%
-    "/register": 0.65,  // Register: 65%
-    "/admin": 0.12,     // Admin Portal: 12% (10–15% range)
-    "/download": 0.50,  // Download Page: 50%
+    "/": 0.68,           // Homepage: 65–70%
+    "/discover": 0.28,   // Discover: 25–30%
+    "/library": 0.22,    // Library: 20–25%
+    "/developers": 0.28, // Developers: 25–30%
+    "/download": 0.28,   // Download: 25–30%
+    "/login": 0.38,      // Login: 35–40%
+    "/register": 0.38,   // Register: 35–40%
+    "/admin": 0.05,      // Admin Portal: 0–10%
   },
 };
 
 /**
  * Resolves the recommended spotlight intensity for any given pathname.
- * Prefers exact matches, then route prefixes, defaulting to 0.50.
+ * Prefers exact matches, then route prefixes, defaulting to 0.25.
  */
 export function getIntensityForRoute(pathname: string | null): number {
-  if (!pathname) return 1.0;
-  if (pathname === "/") return SPOTLIGHT_CONFIG.routeIntensities["/"] ?? 1.0;
+  if (!pathname) return 0.68;
+  if (pathname === "/") return SPOTLIGHT_CONFIG.routeIntensities["/"] ?? 0.68;
 
   for (const [route, intensity] of Object.entries(SPOTLIGHT_CONFIG.routeIntensities)) {
     if (route !== "/" && pathname.startsWith(route)) {
@@ -126,5 +128,5 @@ export function getIntensityForRoute(pathname: string | null): number {
     }
   }
 
-  return 0.50;
+  return 0.25;
 }
