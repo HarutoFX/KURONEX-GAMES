@@ -28,5 +28,15 @@
     "createdAt": "2026-10-09T07:58:29.783Z",
     "role": "player",
     "library": []
+  },
+  {
+    "id": "kuro_dev_studio_01",
+    "username": "studio_dev",
+    "email": "studio@kuronex.dev",
+    "passwordHash": "c6fb54f691ccc7353cd7409421c56b9176dd5fb2b5027b653bbe3eee4777dc500136483d265291e32c54e3b347e47365e321ebd8c7d97f960a766925157a1a35",
+    "salt": "f8139299bfc740f89b8d9080f54f21cd",
+    "createdAt": "2026-11-01T00:00:00.000Z",
+    "role": "developer",
+    "library": []
   }
 ]

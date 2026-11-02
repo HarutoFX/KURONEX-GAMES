@@ -7,16 +7,21 @@ import {
   Monitor,
   Apple,
   Terminal,
+  Copy,
+  Ticket,
 } from "lucide-react";
 import { AuroraText } from "@/registry/magicui/aurora-text";
 import { SiteNavbar, SiteFooter } from "@/components/ui/navigation";
 import { Button } from "@/components/ui/button";
+import { downloadsService } from "@/services/downloads.service";
+import { WaitlistEntryDto } from "@/services/types";
 
 export default function DownloadPage() {
   const [selectedOS, setSelectedOS] = useState<"windows" | "macos" | "linux">("windows");
   const [emailInput, setEmailInput] = useState("");
-  const [isNotified, setIsNotified] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [ticket, setTicket] = useState<WaitlistEntryDto | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const handleNotifySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,20 +29,25 @@ export default function DownloadPage() {
 
     setIsSubmitting(true);
     try {
-      await fetch("/api/downloads", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          itemType: "client",
-          itemId: "kuronex-launcher-preview",
-          platform: selectedOS,
-        }),
+      const res = await downloadsService.joinWaitlist({
+        email: emailInput.trim(),
+        platform: selectedOS,
       });
-      setIsNotified(true);
-    } catch {
-      setIsNotified(true);
+      if (res.entry) {
+        setTicket(res.entry);
+      }
+    } catch (err) {
+      console.error("Waitlist error:", err);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const copyToken = () => {
+    if (ticket?.vipToken) {
+      navigator.clipboard.writeText(ticket.vipToken);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
     }
   };
 
@@ -46,30 +56,23 @@ export default function DownloadPage() {
       {/* ─── 1. NAVBAR ────────────────────────────────────────── */}
       <SiteNavbar activeItem="Download" />
 
-      {/* ─── 2. DOWNLOAD HERO ─────────────────────────────────────────────── */}
+      {/* ─── 2. MAIN DOWNLOAD HERO ────────────────────────────────────────── */}
       <main className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 pt-28 sm:pt-36 pb-20 flex-1">
         <div className="max-w-4xl mx-auto text-center space-y-4">
           <div className="eyebrow mx-auto">
             <span className="eyebrow-dot" aria-hidden="true" />
-            STANDALONE DESKTOP CLIENT // COMING SOON
+            STANDALONE CLIENT APP • ALPHA RELEASE
           </div>
           <h1 className="text-4xl sm:text-6xl md:text-7xl font-extrabold tracking-tight text-[#FFFFFF] leading-tight">
             <AuroraText>Download Kuronex App.</AuroraText>
           </h1>
           <p className="mt-4 text-base sm:text-lg text-[#929292] leading-relaxed max-w-2xl mx-auto">
-            The ultra-fast, zero-bloat client application built to launch and manage your game collection
-            with lightning responsiveness and near-zero system overhead.
+            Experience the next-generation game library application. Engineered from the ground up
+            in native code for zero idle bloat, instantaneous game launches, and hardware-accelerated UI.
           </p>
-
-          <div className="pt-2 flex items-center justify-center gap-3">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-[#FF263D]/40 bg-[#FF263D]/10 px-4 py-1.5 text-xs font-bold text-[#FF4054] shadow-[0_0_20px_rgba(255,38,61,0.25)]">
-              <span className="h-2 w-2 rounded-full bg-[#FF263D] animate-ping" />
-              STATUS: PRIVATE DEVELOPER PREVIEW
-            </span>
-          </div>
         </div>
 
-        {/* ─── 3. OPERATING SYSTEM CARDS ────────────────────────────────────── */}
+        {/* ─── 3. OPERATING SYSTEMS CARDS GRID ──────────────────────────────── */}
         <div className="mt-14 grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Windows Card */}
           <div
@@ -148,7 +151,7 @@ export default function DownloadPage() {
         </div>
 
         {/* ─── 4. NOTIFY / EARLY ACCESS SIGNUP MODULE ───────────────────────── */}
-        <div className="mt-14 rounded-2xl border border-[#292929] bg-gradient-to-br from-[#111111] via-[#141414] to-[#080808] p-8 sm:p-14 shadow-[0_0_60px_rgba(255,38,61,0.06)] backdrop-blur-2xl text-center relative overflow-hidden">
+        <div className="mt-14 rounded-3xl border border-[#292929] bg-gradient-to-br from-[#111111] via-[#141414] to-[#080808] p-8 sm:p-14 shadow-[0_0_60px_rgba(255,38,61,0.06)] backdrop-blur-2xl text-center relative overflow-hidden">
           <div className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 h-48 w-96 rounded-full bg-[radial-gradient(circle,rgba(255,38,61,0.18)_0%,transparent_70%)] blur-2xl" />
 
           <div className="relative z-10 max-w-2xl mx-auto space-y-4">
@@ -164,10 +167,68 @@ export default function DownloadPage() {
             </p>
 
             <div className="pt-4 flex justify-center">
-              {isNotified ? (
-                <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-6 py-3.5 text-xs font-bold text-emerald-400">
-                  <Check className="h-4 w-4" />
-                  <span>You are on the VIP client launch list for {selectedOS}!</span>
+              {ticket ? (
+                /* ─── INTERACTIVE VIP CYBER TICKET ─── */
+                <div className="w-full max-w-md rounded-2xl border border-cyan-500/40 bg-gradient-to-b from-[#031B24] to-[#07080A] p-6 text-left shadow-[0_0_40px_rgba(0,229,255,0.15)] space-y-4 animate-in zoom-in-95 duration-300">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                    <div className="flex items-center gap-2">
+                      <Ticket className="h-4 w-4 text-[#00E5FF]" />
+                      <span className="font-mono text-xs font-bold text-white uppercase">
+                        Kuronex VIP Client Pass
+                      </span>
+                    </div>
+                    <span className="rounded-full bg-cyan-500/10 border border-cyan-500/30 px-2 py-0.5 text-[10px] font-mono font-bold text-cyan-400">
+                      Wave 1 Access
+                    </span>
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-mono uppercase text-[#929292]">Reserved Email</span>
+                    <p className="text-sm font-bold text-white truncate">{ticket.email}</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 text-xs font-mono">
+                    <div className="rounded-xl border border-white/5 bg-black/40 p-2.5">
+                      <span className="text-[10px] text-[#929292] block">Queue Position</span>
+                      <span className="text-lg font-bold text-[#00E5FF]">#{ticket.queueNumber}</span>
+                    </div>
+                    <div className="rounded-xl border border-white/5 bg-black/40 p-2.5">
+                      <span className="text-[10px] text-[#929292] block">Platform Target</span>
+                      <span className="text-sm font-bold text-white capitalize">{ticket.platform}</span>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-dashed border-cyan-500/30 bg-[#020508] p-3 space-y-1">
+                    <span className="text-[10px] font-mono uppercase text-[#929292] block">
+                      VIP Client Invite Token
+                    </span>
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-xs font-bold text-[#FF4054] tracking-wider">
+                        {ticket.vipToken}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={copyToken}
+                        className="inline-flex items-center gap-1 text-[11px] font-bold text-white bg-white/10 hover:bg-white/20 px-2.5 py-1 rounded-lg transition cursor-pointer"
+                      >
+                        {copied ? (
+                          <>
+                            <Check className="h-3 w-3 text-emerald-400" />
+                            <span className="text-emerald-400">Copied</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-3 w-3" />
+                            <span>Copy</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  <p className="text-[11px] text-[#929292] text-center italic">
+                    When the binary drops for {ticket.platform}, an authenticated download payload will be delivered to your inbox.
+                  </p>
                 </div>
               ) : (
                 <form onSubmit={handleNotifySubmit} className="flex flex-col sm:flex-row items-center gap-3 w-full max-w-md">

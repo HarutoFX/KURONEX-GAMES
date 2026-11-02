@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json().catch(() => ({}));
-    const { username, email, password } = body;
+    const { username, email, password, role } = body;
 
     // 1. Validation
     if (!username || typeof username !== "string" || username.trim().length < 3) {
@@ -92,7 +92,12 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Create User & Session
-    const user = createUser({ username: trimmedUsername, email: trimmedEmail, password });
+    const user = createUser({
+      username: trimmedUsername,
+      email: trimmedEmail,
+      password,
+      role: role === "developer" ? "developer" : "player",
+    });
     const sessionToken = createSession(user.id, req);
 
     // Track genuine registration event

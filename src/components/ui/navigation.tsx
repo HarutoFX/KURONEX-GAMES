@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Shield } from "lucide-react";
+import { Shield, Code2 } from "lucide-react";
 import {
   Navbar,
   NavBody,
@@ -108,6 +108,16 @@ export function SiteNavbar({
             >
               <Shield className="h-3.5 w-3.5" />
               <span>Admin</span>
+            </Link>
+          )}
+
+          {user?.role === "developer" && (
+            <Link
+              href="/developers"
+              className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-cyan-500/40 bg-cyan-500/10 px-3.5 py-1.5 text-xs font-bold text-cyan-400 hover:bg-cyan-500/20 transition"
+            >
+              <Code2 className="h-3.5 w-3.5" />
+              <span>Studio</span>
             </Link>
           )}
 
