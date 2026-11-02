@@ -83,7 +83,7 @@ uniform float uBeam3Radius;
 uniform float uBeam3Intensity;
 uniform float uBeam3Decay;
 
-// Volumetric spotlight calculation with soft exponential falloff and localized directional cone
+// Volumetric spotlight calculation with soft exponential falloff
 float calculateSpotlight(
   vec2 p,
   vec2 origin,
@@ -99,21 +99,21 @@ float calculateSpotlight(
   float distAlong = dot(toPoint, dir);
 
   // Soft envelope behind the light source origin
-  float behindFactor = smoothstep(-0.08, 0.05, distAlong);
+  float behindFactor = smoothstep(-0.12, 0.08, distAlong);
   if (behindFactor <= 0.0) return 0.0;
 
   // Perpendicular distance from beam central axis
   float distPerp = length(toPoint - dir * distAlong);
 
-  // Beam cone radius expands smoothly with distance traveled
+  // Beam cone radius expands with distance traveled
   float currentRadius = baseRadius + max(0.0, distAlong) * tan(spread);
 
   // Cross-sectional exponential falloff with soft outer envelope (no harsh edges)
   float normPerp = distPerp / max(0.001, currentRadius);
-  float crossProfile = exp(-pow(normPerp, 2.4) * 3.0) * smoothstep(1.1, 0.0, normPerp);
+  float crossProfile = exp(-pow(normPerp, 2.2) * 2.2) * smoothstep(1.3, 0.0, normPerp);
 
-  // Longitudinal exponential attenuation: naturally cuts off to deep black in center/lower screen
-  float distanceDecay = exp(-distAlong * decay * 1.8) * smoothstep(1.35, 0.15, distAlong);
+  // Longitudinal atmospheric decay
+  float distanceDecay = 1.0 / (1.0 + decay * distAlong + (decay * 0.4) * distAlong * distAlong);
 
   return crossProfile * distanceDecay * behindFactor;
 }
@@ -129,14 +129,14 @@ void main() {
   vec2 o2 = vec2(uBeam2Origin.x * aspect, uBeam2Origin.y);
   vec2 o3 = vec2(uBeam3Origin.x * aspect, uBeam3Origin.y);
 
-  // Subtle organic harmonic sway (slow breathing periods ~18-35 seconds)
-  float angle1 = uBeam1Angle + sin(uTime * 0.28) * 0.045 + cos(uTime * 0.14) * 0.02;
-  float angle2 = uBeam2Angle + sin(uTime * 0.32 + 1.2) * 0.035 + cos(uTime * 0.18) * 0.02;
-  float angle3 = uBeam3Angle + sin(uTime * 0.16 + 2.5) * 0.02;
+  // Subtle organic harmonic sway (slow breathing periods ~15-28 seconds)
+  float angle1 = uBeam1Angle + sin(uTime * 0.35) * 0.07 + cos(uTime * 0.18) * 0.03;
+  float angle2 = uBeam2Angle + sin(uTime * 0.42 + 1.2) * 0.05 + cos(uTime * 0.22) * 0.03;
+  float angle3 = uBeam3Angle + sin(uTime * 0.20 + 2.5) * 0.04;
 
   // Atmospheric micro-haze texture for realistic light-shaft feeling
-  float haze = 1.0 + 0.025 * sin(p.x * 2.8 + p.y * 2.0 + uTime * 0.18)
-                   + 0.02 * cos(p.x * 2.0 - p.y * 3.0 - uTime * 0.12);
+  float haze = 1.0 + 0.04 * sin(p.x * 3.0 + p.y * 2.2 + uTime * 0.22)
+                   + 0.03 * cos(p.x * 2.2 - p.y * 3.4 - uTime * 0.16);
 
   // Calculate individual spotlight contributions
   float light1 = calculateSpotlight(p, o1, angle1, uBeam1Spread, uBeam1Radius, uBeam1Decay) * uBeam1Intensity;
@@ -162,7 +162,7 @@ void main() {
 
   // Subtle theatrical corner vignette to anchor dark contrast
   vec2 uvNorm = vUv * 2.0 - 1.0;
-  float vignette = 1.0 - dot(uvNorm, uvNorm) * 0.22;
+  float vignette = 1.0 - dot(uvNorm, uvNorm) * 0.20;
   color *= max(0.0, vignette);
 
   // High-frequency triangular dither to eliminate 8-bit color banding in dark gradients
@@ -471,8 +471,9 @@ export function SpotlightBackground({ intensity: intensityProp, className = "" }
           className="absolute inset-0 h-full w-full bg-[#080808]"
           style={{
             backgroundImage: `
-              radial-gradient(ellipse 700px 500px at 75% 15%, rgba(0, 209, 255, 0.12), transparent 70%),
-              radial-gradient(ellipse 600px 450px at 20% 18%, rgba(255, 38, 61, 0.08), transparent 65%)
+              radial-gradient(circle 900px at 15% 10%, rgba(0, 209, 255, 0.18), transparent 70%),
+              radial-gradient(circle 700px at 85% 15%, rgba(255, 38, 61, 0.10), transparent 65%),
+              radial-gradient(circle 600px at 20% 90%, rgba(0, 80, 110, 0.12), transparent 70%)
             `,
             opacity: targetIntensity,
             transition: "opacity 0.6s ease-out",
