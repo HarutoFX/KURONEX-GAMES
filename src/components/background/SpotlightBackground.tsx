@@ -83,7 +83,7 @@ uniform float uBeam3Radius;
 uniform float uBeam3Intensity;
 uniform float uBeam3Decay;
 
-// Volumetric spotlight calculation with soft exponential falloff
+// Volumetric spotlight calculation with broad cinematic coverage and soft gradual falloff
 float calculateSpotlight(
   vec2 p,
   vec2 origin,
@@ -99,7 +99,7 @@ float calculateSpotlight(
   float distAlong = dot(toPoint, dir);
 
   // Soft envelope behind the light source origin
-  float behindFactor = smoothstep(-0.12, 0.08, distAlong);
+  float behindFactor = smoothstep(-0.14, 0.10, distAlong);
   if (behindFactor <= 0.0) return 0.0;
 
   // Perpendicular distance from beam central axis
@@ -108,12 +108,12 @@ float calculateSpotlight(
   // Beam cone radius expands with distance traveled
   float currentRadius = baseRadius + max(0.0, distAlong) * tan(spread);
 
-  // Cross-sectional exponential falloff with soft outer envelope (no harsh edges)
+  // Cross-sectional exponential falloff: broad soft envelope with gentle feathering
   float normPerp = distPerp / max(0.001, currentRadius);
-  float crossProfile = exp(-pow(normPerp, 2.2) * 2.2) * smoothstep(1.3, 0.0, normPerp);
+  float crossProfile = exp(-pow(normPerp, 2.0) * 1.85) * smoothstep(1.35, 0.0, normPerp);
 
-  // Longitudinal atmospheric decay
-  float distanceDecay = 1.0 / (1.0 + decay * distAlong + (decay * 0.4) * distAlong * distAlong);
+  // Longitudinal atmospheric decay - smooth gradual falloff across canvas
+  float distanceDecay = 1.0 / (1.0 + decay * distAlong + (decay * 0.35) * distAlong * distAlong);
 
   return crossProfile * distanceDecay * behindFactor;
 }
@@ -135,8 +135,8 @@ void main() {
   float angle3 = uBeam3Angle + sin(uTime * 0.20 + 2.5) * 0.04;
 
   // Atmospheric micro-haze texture for realistic light-shaft feeling
-  float haze = 1.0 + 0.04 * sin(p.x * 3.0 + p.y * 2.2 + uTime * 0.22)
-                   + 0.03 * cos(p.x * 2.2 - p.y * 3.4 - uTime * 0.16);
+  float haze = 1.0 + 0.04 * sin(p.x * 2.8 + p.y * 2.0 + uTime * 0.20)
+                   + 0.03 * cos(p.x * 2.0 - p.y * 3.2 - uTime * 0.15);
 
   // Calculate individual spotlight contributions
   float light1 = calculateSpotlight(p, o1, angle1, uBeam1Spread, uBeam1Radius, uBeam1Decay) * uBeam1Intensity;
@@ -148,21 +148,17 @@ void main() {
   light2 *= haze * uIntensity;
   light3 *= haze * uIntensity;
 
+  // Center blending: combine light contributions with soft compression shoulder
+  // Allows subtle cyan and crimson blending behind hero while preventing oversaturated harsh gradient
+  vec3 lightContribution = uBeam1Color * light1 + uBeam2Color * light2 + uBeam3Color * light3;
+  vec3 compressedLight = lightContribution / (1.0 + lightContribution * 0.28);
+
   // Blend onto deep #080808 void base
-  vec3 color = uBaseColor;
+  vec3 color = uBaseColor + compressedLight;
 
-  // Primary Electric Cyan (#00D1FF) - dominant
-  color += uBeam1Color * light1;
-
-  // Secondary KURONEX Red (#FF263D) - restrained accent
-  color += uBeam2Color * light2;
-
-  // Ambient Deep Cyan/Teal - soft shadow wash
-  color += uBeam3Color * light3;
-
-  // Subtle theatrical corner vignette to anchor dark contrast
+  // Subtle theatrical corner vignette to anchor dark contrast without harsh edges
   vec2 uvNorm = vUv * 2.0 - 1.0;
-  float vignette = 1.0 - dot(uvNorm, uvNorm) * 0.20;
+  float vignette = 1.0 - dot(uvNorm, uvNorm) * 0.16;
   color *= max(0.0, vignette);
 
   // High-frequency triangular dither to eliminate 8-bit color banding in dark gradients
@@ -471,9 +467,9 @@ export function SpotlightBackground({ intensity: intensityProp, className = "" }
           className="absolute inset-0 h-full w-full bg-[#080808]"
           style={{
             backgroundImage: `
-              radial-gradient(circle 900px at 15% 10%, rgba(0, 209, 255, 0.18), transparent 70%),
-              radial-gradient(circle 700px at 85% 15%, rgba(255, 38, 61, 0.10), transparent 65%),
-              radial-gradient(circle 600px at 20% 90%, rgba(0, 80, 110, 0.12), transparent 70%)
+              radial-gradient(ellipse 1100px 800px at 80% 12%, rgba(0, 209, 255, 0.22), transparent 75%),
+              radial-gradient(ellipse 950px 700px at 15% 15%, rgba(255, 38, 61, 0.14), transparent 70%),
+              radial-gradient(ellipse 850px 600px at 50% 95%, rgba(0, 95, 130, 0.15), transparent 75%)
             `,
             opacity: targetIntensity,
             transition: "opacity 0.6s ease-out",

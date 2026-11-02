@@ -53,48 +53,50 @@ export const SPOTLIGHT_CONFIG: SpotlightSystemConfig = {
 
   // ── Primary Spotlight: Electric Cyan #00D1FF ────────────────────────────────
   // Dominant cinematic beam shining from upper-right down-left across the hero
+  // Expanded spread angle and soft gradual falloff for broad viewport illumination
   primaryBeam: {
     id: "beam-cyan",
     name: "Primary Electric Cyan",
     color: [0.0, 0.8196, 1.0], // #00D1FF
-    origin: [1.12, 1.12],      // Upper-right corner outside viewport
-    baseAngle: -2.45,          // ~ -140 degrees (down-left towards center)
-    spread: 0.58,              // Broad cinematic theatrical cone
-    baseRadius: 0.16,          // Soft luminous source
-    intensity: 0.90,           // Dominant ambient lighting
-    decay: 0.38,               // Smooth distance falloff
-    oscillationSpeed: 0.32,    // Slow breathing
+    origin: [1.14, 1.14],      // Upper-right corner outside viewport
+    baseAngle: -2.42,          // ~ -138.6 degrees (down-left across hero)
+    spread: 0.70,              // Broad, expansive cinematic cone (~40 deg half-angle)
+    baseRadius: 0.18,          // Soft luminous source
+    intensity: 0.92,           // Dominant ambient lighting
+    decay: 0.34,               // Soft, gradual distance falloff
+    oscillationSpeed: 0.30,    // Slow breathing
     swayAmplitude: 0.07,       // Subtle organic sway
   },
 
   // ── Secondary Spotlight: KURONEX Red #FF263D ────────────────────────────────
-  // Restrained secondary beam accentuating from upper-left behind "Build Your" & CTA
+  // Restrained secondary beam accentuating from upper-left across "Build Your" & center
+  // Expanded spread angle to softly illuminate a broader portion of the left background
   secondaryBeam: {
     id: "beam-red",
     name: "Secondary KURONEX Red",
     color: [1.0, 0.149, 0.2392], // #FF263D
-    origin: [-0.10, 0.95],       // Upper-left corner outside viewport
-    baseAngle: -0.55,            // ~ -31 degrees (down-right towards center)
-    spread: 0.50,                // Soft cone
-    baseRadius: 0.14,            // Soft source
-    intensity: 0.55,             // Restrained crimson illumination
-    decay: 0.45,                 // Fades cleanly into deep void
-    oscillationSpeed: 0.40,      // Slow harmonic
+    origin: [-0.12, 0.98],       // Upper-left corner outside viewport
+    baseAngle: -0.52,            // ~ -30 degrees (down-right towards center)
+    spread: 0.62,                // Expanded soft cone (~35.5 deg half-angle)
+    baseRadius: 0.16,            // Soft source
+    intensity: 0.58,             // Rich crimson illumination
+    decay: 0.40,                 // Soft gradual falloff into deep void
+    oscillationSpeed: 0.38,      // Slow harmonic
     swayAmplitude: 0.06,         // Controlled sway
   },
 
   // ── Ambient Counter-Glow: Deep Cyan Wash ─────────────────────────────────────
-  // Soft ambient ground light to prevent deep shadows from feeling dead
+  // Soft ambient ground light to prevent lower viewport from being completely black
   ambientBeam: {
     id: "beam-ambient-cyan",
     name: "Ambient Deep Cyan",
-    color: [0.0, 0.28, 0.40],   // Deep teal/cyan wash
+    color: [0.0, 0.26, 0.38],   // Deep atmospheric teal/cyan wash
     origin: [0.50, -0.15],      // Center-bottom
     baseAngle: 1.57,            // Points straight up (~90 degrees)
-    spread: 1.10,               // Very wide diffuse wash
-    baseRadius: 0.30,           // Broad soft source
-    intensity: 0.20,            // Subtle ambient fill
-    decay: 0.85,                // Fades out before top
+    spread: 1.18,               // Very wide diffuse wash
+    baseRadius: 0.32,           // Broad soft source
+    intensity: 0.22,            // Restored subtle ambient fill
+    decay: 0.80,                // Smooth gradual upward attenuation
     oscillationSpeed: 0.25,     // Gentle drift
     swayAmplitude: 0.05,        // Minimal sway
   },
