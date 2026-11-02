@@ -4,6 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { MagicCard } from "@/components/ui/magic-card";
+import { GradientText } from "@/components/ui/gradient-text";
 
 interface AuthLayoutProps {
   children: React.ReactNode;
@@ -101,7 +102,7 @@ export function AuthLayout({
 
             {/* Main Heading */}
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#FFFFFF]">
-              {heading}
+              <GradientText as="span">{heading}</GradientText>
             </h1>
 
             {/* Subtitle */}

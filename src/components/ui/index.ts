@@ -15,5 +15,6 @@ export * from "./floating-dock";
 export * from "./magic-card";
 export * from "./label";
 export * from "./cursor-follower";
+export * from "./gradient-text";
 
 

@@ -3,17 +3,17 @@
 import Link from "next/link";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { ArrowRight, Play } from "lucide-react";
-import { AuroraText } from "@/registry/magicui/aurora-text";
+import { GradientText } from "@/components/ui/gradient-text";
 import { SiteNavbar } from "@/components/ui/navigation";
 
 export function HeroTitle() {
   return (
     <h1 className="text-6xl font-bold tracking-[-0.055em] leading-[0.88] md:text-7xl lg:text-8xl">
-      <AuroraText>
+      <GradientText as="span">
         Build Your
         <br />
         Own Library.
-      </AuroraText>
+      </GradientText>
     </h1>
   );
 }
@@ -38,7 +38,7 @@ export function Hero() {
             THE NEXT GENERATION OF GAME LIBRARIES
           </div>
 
-          {/* Headline with Magic UI AuroraText */}
+          {/* Headline with KURONEX GradientText */}
           <HeroTitle />
 
           {/* Description */}

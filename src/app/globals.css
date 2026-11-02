@@ -323,6 +323,25 @@ a {
   font-weight: 700;
 }
 
+@keyframes kuronexGradient {
+  0% {
+    background-position: 0% 50%;
+  }
+
+  50% {
+    background-position: 100% 50%;
+  }
+
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.animate-kuronex-gradient {
+  animation: kuronexGradient 8s ease-in-out infinite;
+  will-change: background-position;
+}
+
 @keyframes aurora {
   0% {
     background-position: 0% 50%;
@@ -338,7 +357,16 @@ a {
 }
 
 .animate-aurora {
-  animation: aurora 3s ease-in-out infinite alternate;
+  animation: kuronexGradient 8s ease-in-out infinite;
+  will-change: background-position;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-kuronex-gradient,
+  .animate-aurora {
+    animation: none !important;
+    background-position: 50% 50% !important;
+  }
 }
 
 @keyframes marquee {
