@@ -121,3 +121,4 @@ GradientText.displayName = "GradientText";
 export const AuroraText = GradientText;
 
 export default GradientText;
+
