@@ -3,7 +3,7 @@
  *
  * Defines the shared configuration for the WebGL Spotlight Background system,
  * including brand color tokens, beam geometry, animation parameters, and
- * page-specific intensity levels.
+ * page-specific intensity levels inspired by Aceternity UI.
  */
 
 export interface SpotlightBeamDefinition {
@@ -52,34 +52,34 @@ export const SPOTLIGHT_CONFIG: SpotlightSystemConfig = {
   maxDpr: 1.5,
 
   // ── Primary Spotlight: Electric Cyan #00D1FF ────────────────────────────────
-  // Dominant cinematic beam shining diagonally down-right across the canvas
+  // Dominant cinematic beam shining from upper-right down-left across the hero
   primaryBeam: {
     id: "beam-cyan",
     name: "Primary Electric Cyan",
     color: [0.0, 0.8196, 1.0], // #00D1FF
-    origin: [-0.08, 1.08],     // Top-left just outside viewport
-    baseAngle: -0.64,          // ~ -37 degrees (down and right)
-    spread: 0.52,              // Broad cinematic cone (~30 deg half-angle)
-    baseRadius: 0.12,          // Soft source diameter
-    intensity: 0.95,           // Dominant light source
-    decay: 0.42,               // Gentle atmospheric falloff
-    oscillationSpeed: 0.35,    // Slow, stately breathing
-    swayAmplitude: 0.08,       // Subtle angular sway (~4.5 degrees)
+    origin: [1.12, 1.12],      // Upper-right corner outside viewport
+    baseAngle: -2.45,          // ~ -140 degrees (down-left towards center)
+    spread: 0.58,              // Broad cinematic theatrical cone
+    baseRadius: 0.16,          // Soft luminous source
+    intensity: 0.90,           // Dominant ambient lighting
+    decay: 0.38,               // Smooth distance falloff
+    oscillationSpeed: 0.32,    // Slow breathing
+    swayAmplitude: 0.07,       // Subtle organic sway
   },
 
   // ── Secondary Spotlight: KURONEX Red #FF263D ────────────────────────────────
-  // Restrained secondary beam accentuating from the upper-right
+  // Restrained secondary beam accentuating from upper-left behind "Build Your" & CTA
   secondaryBeam: {
     id: "beam-red",
     name: "Secondary KURONEX Red",
     color: [1.0, 0.149, 0.2392], // #FF263D
-    origin: [1.08, 1.04],        // Top-right just outside viewport
-    baseAngle: -2.48,            // ~ -142 degrees (down and left)
-    spread: 0.40,                // Focused accent cone (~23 deg half-angle)
-    baseRadius: 0.08,            // Tighter source
-    intensity: 0.42,             // Restrained secondary intensity
-    decay: 0.55,                 // Fades cleanly into the dark void
-    oscillationSpeed: 0.45,      // Slightly offset harmonic
+    origin: [-0.10, 0.95],       // Upper-left corner outside viewport
+    baseAngle: -0.55,            // ~ -31 degrees (down-right towards center)
+    spread: 0.50,                // Soft cone
+    baseRadius: 0.14,            // Soft source
+    intensity: 0.55,             // Restrained crimson illumination
+    decay: 0.45,                 // Fades cleanly into deep void
+    oscillationSpeed: 0.40,      // Slow harmonic
     swayAmplitude: 0.06,         // Controlled sway
   },
 
@@ -88,15 +88,15 @@ export const SPOTLIGHT_CONFIG: SpotlightSystemConfig = {
   ambientBeam: {
     id: "beam-ambient-cyan",
     name: "Ambient Deep Cyan",
-    color: [0.0, 0.28, 0.40],  // Deep teal/cyan wash
-    origin: [-0.05, -0.10],    // Bottom-left corner
-    baseAngle: 0.88,           // Points softly up-right (~50 degrees)
-    spread: 0.95,              // Very wide diffuse wash
-    baseRadius: 0.25,          // Broad soft source
-    intensity: 0.22,           // Soft ambient fill
-    decay: 0.80,               // Rapid decay away from corner
-    oscillationSpeed: 0.20,    // Very slow drift
-    swayAmplitude: 0.04,       // Minimal sway
+    color: [0.0, 0.28, 0.40],   // Deep teal/cyan wash
+    origin: [0.50, -0.15],      // Center-bottom
+    baseAngle: 1.57,            // Points straight up (~90 degrees)
+    spread: 1.10,               // Very wide diffuse wash
+    baseRadius: 0.30,           // Broad soft source
+    intensity: 0.20,            // Subtle ambient fill
+    decay: 0.85,                // Fades out before top
+    oscillationSpeed: 0.25,     // Gentle drift
+    swayAmplitude: 0.05,        // Minimal sway
   },
 
   // ── Page-Specific Intensity Table ───────────────────────────────────────────
@@ -128,4 +128,3 @@ export function getIntensityForRoute(pathname: string | null): number {
 
   return 0.50;
 }
-
