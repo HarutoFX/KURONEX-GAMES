@@ -128,3 +128,4 @@ export function getIntensityForRoute(pathname: string | null): number {
 
   return 0.50;
 }
+

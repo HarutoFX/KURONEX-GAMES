@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { SpotlightBackground } from "@/components/background";
-import { CursorFollower } from "@/components/ui/cursor-follower";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -42,8 +41,6 @@ export default function RootLayout({
         <a href="#main-content" className="skip-link">
           Skip to main content
         </a>
-        {/* Sleek GPU-accelerated cyber cursor follower */}
-        <CursorFollower />
         {/*
           SpotlightBackground is position:fixed, z-index:0, pointer-events:none.
           It sits behind all page content on every route with route-specific intensity.
