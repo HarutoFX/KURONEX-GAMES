@@ -30,6 +30,8 @@ import { CmsTab } from "@/components/admin/tabs/CmsTab";
 import { AnnouncementsTab } from "@/components/admin/tabs/AnnouncementsTab";
 import { AuditTab } from "@/components/admin/tabs/AuditTab";
 import { SettingsTab } from "@/components/admin/tabs/SettingsTab";
+import { AdminProfileModal } from "@/components/admin/AdminProfileModal";
+import { BackendExportModal } from "@/components/admin/BackendExportModal";
 
 export default function AdminPage() {
   const router = useRouter();
@@ -74,6 +76,8 @@ export default function AdminPage() {
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>("Action");
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [exportModalOpen, setExportModalOpen] = useState(false);
 
   const showToast = (message: string, type: "success" | "error" = "success") => {
     setToast({ message, type });
@@ -443,10 +447,10 @@ export default function AdminPage() {
               <span>Back Home</span>
             </Link>
             <Link
-              href="/login"
+              href="/admin/auth"
               className="flex-1 rounded-xl bg-[#FF263D] py-2.5 text-xs font-bold text-white shadow-lg transition hover:bg-[#FF4054] text-center"
             >
-              Admin Sign In
+              Admin Sign In & Provisioning
             </Link>
           </div>
         </div>
@@ -699,6 +703,8 @@ export default function AdminPage() {
                 currentUser={user}
                 onUpdateRole={handleUpdateRole}
                 onDeleteUser={handleDeleteUser}
+                onOpenProfileModal={() => setProfileModalOpen(true)}
+                onOpenExportModal={() => setExportModalOpen(true)}
               />
             )}
 
@@ -721,6 +727,8 @@ export default function AdminPage() {
                 settings={settings}
                 onSaveSettings={handleSaveSettings}
                 isSaving={isSaving}
+                onOpenProfileModal={() => setProfileModalOpen(true)}
+                onOpenExportModal={() => setExportModalOpen(true)}
               />
             )}
           </main>
@@ -735,6 +743,22 @@ export default function AdminPage() {
             <span className="text-[#FF263D]">{settings.clientVersion}</span>
           </div>
         </footer>
+
+        {/* Admin Modals */}
+        <AdminProfileModal
+          isOpen={profileModalOpen}
+          onClose={() => setProfileModalOpen(false)}
+          currentUser={user}
+          onProfileUpdated={() => {
+            showToast("Credentials updated. Refreshing directory...");
+            loadAllData();
+          }}
+        />
+
+        <BackendExportModal
+          isOpen={exportModalOpen}
+          onClose={() => setExportModalOpen(false)}
+        />
       </div>
     </div>
   );
