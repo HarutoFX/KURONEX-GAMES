@@ -1,0 +1,12 @@
+[
+  {
+    "id": "kuro_dev_admin_root",
+    "username": "admin",
+    "email": "admin@kuronex.games",
+    "passwordHash": "62d69fb06a2ff061caf244591ffd778cafb871c79dce7c0da5cadb2cbe625c047169a40cd7468d42da9a6f852000674934f5559f3317fffcc62ba8041cd8ad88",
+    "salt": "907bc5185665c58674b2fa38f4e2a86f",
+    "createdAt": "2026-11-03T02:20:00.000Z",
+    "role": "admin",
+    "library": []
+  }
+]

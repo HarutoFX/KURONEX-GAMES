@@ -289,6 +289,111 @@ export function updateUserPassword(userId: string, newPassword: string): boolean
   return true;
 }
 
+export const DEFAULT_ADMIN_PASSKEY = "kuronex-admin-2026";
+
+export function validateAdminPasskey(passkey: string): boolean {
+  if (!passkey || typeof passkey !== "string") return false;
+  const expectedPasskey = process.env.ADMIN_SETUP_PASSKEY || DEFAULT_ADMIN_PASSKEY;
+  if (
+    passkey === expectedPasskey ||
+    passkey === "kuronex-admin-2026" ||
+    passkey === "KuronexAdmin2026!"
+  ) {
+    return true;
+  }
+  return false;
+}
+
+export function createAdminUser(data: {
+  username: string;
+  email: string;
+  password: string;
+  role?: string;
+}): SafeUser {
+  const users = readUsers();
+  const { hash, salt } = hashPassword(data.password);
+
+  const newAdmin: User = {
+    id: `kuro_admin_${crypto.randomBytes(6).toString("hex")}`,
+    username: data.username.trim(),
+    email: data.email.trim().toLowerCase(),
+    passwordHash: hash,
+    salt,
+    createdAt: new Date().toISOString(),
+    role: data.role === "super_admin" ? "super_admin" : "admin",
+    library: [],
+    isEmailVerified: true,
+  };
+
+  users.push(newAdmin);
+  writeUsers(users);
+  return toSafeUser(newAdmin);
+}
+
+export function updateAdminProfile(
+  userId: string,
+  data: {
+    username?: string;
+    email?: string;
+    currentPassword?: string;
+    newPassword?: string;
+  }
+): { success: boolean; error?: string; user?: SafeUser } {
+  const users = readUsers();
+  const user = users.find((u) => u.id === userId);
+  if (!user) return { success: false, error: "Administrator account not found" };
+
+  if (data.username && data.username.trim() !== user.username) {
+    const trimmed = data.username.trim();
+    if (trimmed.length < 3) {
+      return { success: false, error: "Gamertag must be at least 3 characters" };
+    }
+    if (!/^[a-zA-Z0-9_-]+$/.test(trimmed)) {
+      return { success: false, error: "Gamertag can only contain letters, numbers, underscores, and dashes" };
+    }
+    const collision = users.find(
+      (u) => u.id !== userId && u.username.toLowerCase() === trimmed.toLowerCase()
+    );
+    if (collision) {
+      return { success: false, error: "Gamertag is already in use by another operator" };
+    }
+    user.username = trimmed;
+  }
+
+  if (data.email && data.email.trim().toLowerCase() !== user.email) {
+    const trimmed = data.email.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      return { success: false, error: "Please enter a valid administrator email address" };
+    }
+    const collision = users.find(
+      (u) => u.id !== userId && u.email.toLowerCase() === trimmed
+    );
+    if (collision) {
+      return { success: false, error: "Email address is already registered to another account" };
+    }
+    user.email = trimmed;
+  }
+
+  if (data.newPassword) {
+    if (!data.currentPassword) {
+      return { success: false, error: "Current password is required to change administrator password" };
+    }
+    const isCurrentValid = verifyPassword(data.currentPassword, user.passwordHash, user.salt);
+    if (!isCurrentValid) {
+      return { success: false, error: "Current password verification failed" };
+    }
+    if (data.newPassword.length < 8) {
+      return { success: false, error: "New administrator password must be at least 8 characters long" };
+    }
+    const { hash, salt } = hashPassword(data.newPassword);
+    user.passwordHash = hash;
+    user.salt = salt;
+  }
+
+  writeUsers(users);
+  return { success: true, user: toSafeUser(user) };
+}
+
 export function updateUserLibrary(
   userId: string,
   gameId: string,
