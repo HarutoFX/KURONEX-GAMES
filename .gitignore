@@ -53,6 +53,8 @@ next-env.d.ts
 .idea/
 
 # local AI / assistant instructions
+AGENTS.md
+CLAUDE.md
 GEMINI.md
 .gemini/
 
