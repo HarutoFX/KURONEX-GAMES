@@ -10,7 +10,7 @@ import {
   Activity,
   X,
 } from "lucide-react";
-import { Announcement } from "@/lib/admin-store";
+import type { Announcement } from "@/lib/admin-store";
 import { GradientText } from "@/components/ui/gradient-text";
 
 interface AdminHeaderProps {

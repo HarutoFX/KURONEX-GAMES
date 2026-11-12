@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { AuditLog } from "@/lib/admin-store";
+import type { AuditLog } from "@/lib/admin-store";
 
 interface AuditTabProps {
   filteredLogs: AuditLog[];

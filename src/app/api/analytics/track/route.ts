@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     const sanitizedResourceId =
       typeof resourceId === "string" ? resourceId.trim().replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64) : undefined;
 
-    const event = trackEvent({
+    const event = await trackEvent({
       eventType,
       category: eventType.startsWith("download") ? "downloads" : "engagement",
       userId: user?.id,

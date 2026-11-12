@@ -1,7 +1,6 @@
-import fs from "fs";
-import path from "path";
-import { User, SafeUser, toSafeUser, revokeAllUserSessions } from "./auth";
-import { atomicWriteJsonSync } from "./db/atomic-store";
+import crypto from "crypto";
+import prisma from "./prisma";
+import { SafeUser, revokeAllUserSessions, resolveRoleId } from "./auth";
 
 export interface AuditLog {
   id: string;
@@ -38,156 +37,6 @@ export interface PlatformSettings {
   featuredCategory: string;
 }
 
-const AUDIT_FILE = path.join(process.cwd(), "src", "data", "audit-logs.json");
-const ANNOUNCEMENTS_FILE = path.join(process.cwd(), "src", "data", "announcements.json");
-const SETTINGS_FILE = path.join(process.cwd(), "src", "data", "platform-settings.json");
-const USERS_FILE = path.join(process.cwd(), "src", "data", "users.json");
-
-function ensureFile(filePath: string, defaultContent: string) {
-  const dir = path.dirname(filePath);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  if (!fs.existsSync(filePath)) {
-    fs.writeFileSync(filePath, defaultContent, "utf-8");
-  }
-}
-
-// ─── AUDIT LOGS ─────────────────────────────────────────────────────────────
-export function getAuditLogs(): AuditLog[] {
-  try {
-    ensureFile(AUDIT_FILE, "[]");
-    const data = fs.readFileSync(AUDIT_FILE, "utf-8");
-    const logs = JSON.parse(data || "[]");
-    return Array.isArray(logs)
-      ? logs.sort((a: AuditLog, b: AuditLog) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-      : [];
-  } catch (error) {
-    console.error("Failed to read audit logs:", error);
-    return [];
-  }
-}
-
-export function logAdminAction(
-  action: string,
-  category: AuditLog["category"],
-  target: string,
-  details: string,
-  actor = "kuronex_dev",
-  status: AuditLog["status"] = "SUCCESS"
-): AuditLog {
-  const logs = getAuditLogs();
-  const newLog: AuditLog = {
-    id: `log_${Date.now()}`,
-    action,
-    category,
-    actor,
-    target,
-    details,
-    timestamp: new Date().toISOString(),
-    status,
-  };
-  logs.unshift(newLog);
-  try {
-    atomicWriteJsonSync(AUDIT_FILE, logs.slice(0, 500));
-  } catch (error) {
-    console.error("Failed to write audit log:", error);
-  }
-  return newLog;
-}
-
-// ─── ANNOUNCEMENTS ──────────────────────────────────────────────────────────
-const DEFAULT_ANNOUNCEMENTS: Announcement[] = [
-  {
-    id: "ann_01",
-    title: "Kuronex Alpha Client v1.4.2 Deployed",
-    message: "New direct-to-metal rendering backend enabled for Windows and Linux installations.",
-    priority: "HIGH",
-    category: "UPDATE",
-    isActive: true,
-    publishedAt: new Date(Date.now() - 3600000 * 36).toISOString(),
-    author: "kuronex_dev",
-  },
-  {
-    id: "ann_02",
-    title: "Global Playtest Weekend Commencing",
-    message: "Servers for Voidstrike: Infinite and Neon Haven open for unrestricted stress testing.",
-    priority: "NORMAL",
-    category: "COMMUNITY",
-    isActive: true,
-    publishedAt: new Date(Date.now() - 3600000 * 8).toISOString(),
-    author: "kuronex_dev",
-  },
-  {
-    id: "ann_03",
-    title: "Scheduled Cloud Save Maintenance",
-    message: "Database indexing scheduled for Tuesday at 03:00 UTC. Zero downtime anticipated.",
-    priority: "LOW",
-    category: "MAINTENANCE",
-    isActive: false,
-    publishedAt: new Date(Date.now() - 3600000 * 72).toISOString(),
-    author: "kuronex_dev",
-  },
-];
-
-export function getAnnouncements(): Announcement[] {
-  try {
-    ensureFile(ANNOUNCEMENTS_FILE, JSON.stringify(DEFAULT_ANNOUNCEMENTS, null, 2));
-    const data = fs.readFileSync(ANNOUNCEMENTS_FILE, "utf-8");
-    return JSON.parse(data || "[]");
-  } catch (error) {
-    console.error("Failed to read announcements:", error);
-    return DEFAULT_ANNOUNCEMENTS;
-  }
-}
-
-export function saveAnnouncements(announcements: Announcement[]): boolean {
-  try {
-    atomicWriteJsonSync(ANNOUNCEMENTS_FILE, announcements);
-    return true;
-  } catch (error) {
-    console.error("Failed to write announcements:", error);
-    return false;
-  }
-}
-
-export function createAnnouncement(data: Omit<Announcement, "id" | "publishedAt">, actor = "system"): Announcement {
-  const list = getAnnouncements();
-  const created: Announcement = {
-    ...data,
-    id: `ann_${Date.now()}`,
-    publishedAt: new Date().toISOString(),
-  };
-  list.unshift(created);
-  saveAnnouncements(list);
-  logAdminAction("Created Announcement", "CMS", created.title, `New announcement broadcasted: ${created.title}`, actor);
-  return created;
-}
-
-export function toggleAnnouncement(id: string, actor = "system"): boolean {
-  const list = getAnnouncements();
-  const item = list.find((a) => a.id === id);
-  if (item) {
-    item.isActive = !item.isActive;
-    saveAnnouncements(list);
-    logAdminAction("Toggle Announcement", "CMS", item.title, `Announcement ${item.title} toggled to ${item.isActive ? "active" : "inactive"}`, actor);
-    return true;
-  }
-  return false;
-}
-
-export function deleteAnnouncement(id: string, actor = "system"): boolean {
-  const list = getAnnouncements();
-  const filtered = list.filter((a) => a.id !== id);
-  if (filtered.length !== list.length) {
-    saveAnnouncements(filtered);
-    logAdminAction("Delete Announcement", "CMS", id, `Removed announcement ${id}`, actor);
-    return true;
-  }
-  return false;
-}
-
-// ─── PLATFORM SETTINGS ──────────────────────────────────────────────────────
 const DEFAULT_SETTINGS: PlatformSettings = {
   platformName: "KURONEX GAMES",
   tagline: "Build Your Own Library.",
@@ -201,58 +50,292 @@ const DEFAULT_SETTINGS: PlatformSettings = {
   featuredCategory: "Action",
 };
 
-export function getPlatformSettings(): PlatformSettings {
+// ─── AUDIT LOGS ─────────────────────────────────────────────────────────────
+export async function getAuditLogs(): Promise<AuditLog[]> {
   try {
-    ensureFile(SETTINGS_FILE, JSON.stringify(DEFAULT_SETTINGS, null, 2));
-    const data = fs.readFileSync(SETTINGS_FILE, "utf-8");
-    return { ...DEFAULT_SETTINGS, ...JSON.parse(data || "{}") };
+    const logs = await prisma.auditLog.findMany({
+      orderBy: { timestamp: "desc" },
+      take: 500,
+    });
+    return logs.map((l) => ({
+      id: l.id,
+      action: l.action,
+      category: (l.category as AuditLog["category"]) || "SYSTEM",
+      actor: l.actorUsername,
+      target: l.target,
+      details: l.details,
+      timestamp: l.timestamp.toISOString(),
+      status: (l.status as AuditLog["status"]) || "SUCCESS",
+    }));
+  } catch (error) {
+    console.error("Failed to read audit logs:", error);
+    return [];
+  }
+}
+
+export async function logAdminAction(
+  action: string,
+  category: AuditLog["category"],
+  target: string,
+  details: string,
+  actor = "system",
+  status: AuditLog["status"] = "SUCCESS",
+  actorId?: string,
+  ipAddress?: string
+): Promise<AuditLog> {
+  const id = `log_${Date.now()}_${crypto.randomBytes(2).toString("hex")}`;
+  try {
+    const created = await prisma.auditLog.create({
+      data: {
+        id,
+        action,
+        category,
+        actorId: actorId || null,
+        actorUsername: actor,
+        target,
+        details,
+        status,
+        ipAddress: ipAddress || null,
+      },
+    });
+
+    return {
+      id: created.id,
+      action: created.action,
+      category: created.category as AuditLog["category"],
+      actor: created.actorUsername,
+      target: created.target,
+      details: created.details,
+      timestamp: created.timestamp.toISOString(),
+      status: created.status as AuditLog["status"],
+    };
+  } catch (error) {
+    console.error("Failed to write audit log:", error);
+    return {
+      id,
+      action,
+      category,
+      actor,
+      target,
+      details,
+      timestamp: new Date().toISOString(),
+      status,
+    };
+  }
+}
+
+// ─── ANNOUNCEMENTS ──────────────────────────────────────────────────────────
+export async function getAnnouncements(): Promise<Announcement[]> {
+  try {
+    const list = await prisma.announcement.findMany({
+      orderBy: { publishedAt: "desc" },
+    });
+    return list.map((a) => ({
+      id: a.id,
+      title: a.title,
+      message: a.message,
+      priority: (a.priority as Announcement["priority"]) || "NORMAL",
+      category: (a.category as Announcement["category"]) || "UPDATE",
+      isActive: a.isActive,
+      publishedAt: a.publishedAt.toISOString(),
+      author: a.authorName,
+    }));
+  } catch (error) {
+    console.error("Failed to read announcements:", error);
+    return [];
+  }
+}
+
+export async function createAnnouncement(
+  data: Omit<Announcement, "id" | "publishedAt">,
+  actor = "system"
+): Promise<Announcement> {
+  const created = await prisma.announcement.create({
+    data: {
+      id: `ann_${Date.now()}_${crypto.randomBytes(2).toString("hex")}`,
+      title: data.title.trim(),
+      message: data.message.trim(),
+      priority: data.priority || "NORMAL",
+      category: data.category || "UPDATE",
+      isActive: data.isActive !== undefined ? Boolean(data.isActive) : true,
+      authorName: data.author || actor,
+    },
+  });
+
+  await logAdminAction(
+    "Created Announcement",
+    "CMS",
+    created.title,
+    `New announcement broadcasted: ${created.title}`,
+    actor
+  );
+
+  return {
+    id: created.id,
+    title: created.title,
+    message: created.message,
+    priority: created.priority as Announcement["priority"],
+    category: created.category as Announcement["category"],
+    isActive: created.isActive,
+    publishedAt: created.publishedAt.toISOString(),
+    author: created.authorName,
+  };
+}
+
+export async function toggleAnnouncement(id: string, actor = "system"): Promise<boolean> {
+  const existing = await prisma.announcement.findUnique({ where: { id } });
+  if (!existing) return false;
+
+  const updated = await prisma.announcement.update({
+    where: { id },
+    data: { isActive: !existing.isActive },
+  });
+
+  await logAdminAction(
+    "Toggle Announcement",
+    "CMS",
+    updated.title,
+    `Announcement ${updated.title} toggled to ${updated.isActive ? "active" : "inactive"}`,
+    actor
+  );
+  return true;
+}
+
+export async function deleteAnnouncement(id: string, actor = "system"): Promise<boolean> {
+  const existing = await prisma.announcement.findUnique({ where: { id }, select: { id: true, title: true } });
+  if (!existing) return false;
+
+  await prisma.announcement.delete({ where: { id } });
+  await logAdminAction("Delete Announcement", "CMS", existing.title || id, `Removed announcement ${id}`, actor);
+  return true;
+}
+
+// ─── PLATFORM SETTINGS ──────────────────────────────────────────────────────
+export async function getPlatformSettings(): Promise<PlatformSettings> {
+  try {
+    const rows = await prisma.platformSetting.findMany();
+    if (rows.length === 0) return DEFAULT_SETTINGS;
+
+    const result: Record<string, unknown> = { ...DEFAULT_SETTINGS };
+    for (const row of rows) {
+      if (row.valueType === "boolean") {
+        result[row.key] = row.value === "true";
+      } else if (row.valueType === "number") {
+        const parsed = Number(row.value);
+        result[row.key] = Number.isNaN(parsed) ? result[row.key] : parsed;
+      } else {
+        result[row.key] = row.value;
+      }
+    }
+    return result as unknown as PlatformSettings;
   } catch (error) {
     console.error("Failed to read platform settings:", error);
     return DEFAULT_SETTINGS;
   }
 }
 
-export function savePlatformSettings(newSettings: Partial<PlatformSettings>, actor = "system"): PlatformSettings {
-  const current = getPlatformSettings();
+export async function savePlatformSettings(
+  newSettings: Partial<PlatformSettings>,
+  actor = "system"
+): Promise<PlatformSettings> {
+  const current = await getPlatformSettings();
   const updated = { ...current, ...newSettings };
+
   try {
-    atomicWriteJsonSync(SETTINGS_FILE, updated);
-    logAdminAction("Update Settings", "SETTINGS", "Platform Configuration", "Saved updated system parameters.", actor);
+    const publicKeys = new Set([
+      "platformName",
+      "tagline",
+      "clientVersion",
+      "clientDownloadUrl",
+      "maintenanceMode",
+      "registrationOpen",
+      "featuredCategory",
+    ]);
+
+    for (const [key, val] of Object.entries(updated)) {
+      if (val === undefined) continue;
+      const valueType =
+        typeof val === "boolean" ? "boolean" : typeof val === "number" ? "number" : "string";
+      await prisma.platformSetting.upsert({
+        where: { key },
+        update: { value: String(val), valueType },
+        create: {
+          key,
+          value: String(val),
+          valueType,
+          isPublic: publicKeys.has(key),
+        },
+      });
+    }
+
+    await logAdminAction(
+      "Update Settings",
+      "SETTINGS",
+      "Platform Configuration",
+      "Saved updated system parameters.",
+      actor
+    );
   } catch (error) {
     console.error("Failed to write settings:", error);
   }
+
   return updated;
 }
 
 // ─── USER ADMIN OPERATIONS ──────────────────────────────────────────────────
-export function getAllUsers(): SafeUser[] {
+export async function getAllUsers(): Promise<SafeUser[]> {
   try {
-    ensureFile(USERS_FILE, "[]");
-    const data = fs.readFileSync(USERS_FILE, "utf-8");
-    const users: User[] = JSON.parse(data || "[]");
-    return users.map(toSafeUser);
+    const users = await prisma.user.findMany({
+      include: { library: { select: { gameId: true } } },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return users.map((u) => ({
+      id: u.id,
+      username: u.username,
+      email: u.email,
+      createdAt: u.createdAt.toISOString(),
+      role: u.role,
+      library: u.library.map((l) => l.gameId),
+      isSuspended: u.isSuspended,
+      isEmailVerified: u.isEmailVerified,
+    }));
   } catch (error) {
     console.error("Failed to read all users:", error);
     return [];
   }
 }
 
-export function updateUserRole(userId: string, newRole: string, actor = "system"): boolean {
+export async function updateUserRole(
+  userId: string,
+  newRole: string,
+  actor = "system"
+): Promise<boolean> {
   try {
-    ensureFile(USERS_FILE, "[]");
-    const data = fs.readFileSync(USERS_FILE, "utf-8");
-    const users: User[] = JSON.parse(data || "[]");
-    const target = users.find((u) => u.id === userId);
+    const target = await prisma.user.findUnique({ where: { id: userId } });
     if (!target) return false;
 
-    // Prevent demoting root admin if it's the only one
-    if (target.id === "kuro_dev_admin_root" && newRole !== "admin" && newRole !== "SUPER_ADMIN") {
+    if (
+      target.id === "kuro_dev_admin_root" &&
+      newRole.toLowerCase() !== "admin" &&
+      newRole.toLowerCase() !== "super_admin"
+    ) {
       return false;
     }
 
-    target.role = newRole;
-    atomicWriteJsonSync(USERS_FILE, users);
-    logAdminAction("Updated User Role", "USERS", target.username, `Role changed to ${newRole} by ${actor}`, actor);
+    const { role, roleId } = await resolveRoleId(newRole);
+    await prisma.user.update({
+      where: { id: userId },
+      data: { role, roleId },
+    });
+
+    await logAdminAction(
+      "Updated User Role",
+      "USERS",
+      target.username,
+      `Role changed to ${role} by ${actor}`,
+      actor
+    );
     return true;
   } catch (error) {
     console.error("Failed to update user role:", error);
@@ -260,30 +343,37 @@ export function updateUserRole(userId: string, newRole: string, actor = "system"
   }
 }
 
-export function suspendUserAccount(userId: string, suspended: boolean, reason = "", actor = "system"): boolean {
+export async function suspendUserAccount(
+  userId: string,
+  suspended: boolean,
+  reason = "",
+  actor = "system"
+): Promise<boolean> {
   try {
-    if (userId === "kuro_dev_admin_root") return false; // Protected root admin cannot be suspended
+    if (userId === "kuro_dev_admin_root") return false;
 
-    ensureFile(USERS_FILE, "[]");
-    const data = fs.readFileSync(USERS_FILE, "utf-8");
-    const users: User[] = JSON.parse(data || "[]");
-    const target = users.find((u) => u.id === userId);
+    const target = await prisma.user.findUnique({ where: { id: userId } });
     if (!target) return false;
 
-    target.isSuspended = suspended;
-    target.suspendedReason = suspended ? reason : undefined;
-    atomicWriteJsonSync(USERS_FILE, users);
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        isSuspended: suspended,
+        suspendedReason: suspended ? reason : null,
+      },
+    });
 
-    // Invalidate all active sessions immediately upon suspension
     if (suspended) {
-      revokeAllUserSessions(userId);
+      await revokeAllUserSessions(userId);
     }
 
-    logAdminAction(
+    await logAdminAction(
       suspended ? "Suspended User Account" : "Reactivated User Account",
       "USERS",
       target.username,
-      suspended ? `Account suspended (${reason || "Policy violation"}) by ${actor}` : `Account reactivated by ${actor}`,
+      suspended
+        ? `Account suspended (${reason || "Policy violation"}) by ${actor}`
+        : `Account reactivated by ${actor}`,
       actor
     );
     return true;
@@ -293,25 +383,27 @@ export function suspendUserAccount(userId: string, suspended: boolean, reason = 
   }
 }
 
-export function deleteUser(userId: string, actor = "system"): boolean {
+export async function deleteUser(userId: string, actor = "system"): Promise<boolean> {
   try {
-    if (userId === "kuro_dev_admin_root") return false; // Protected root admin
+    if (userId === "kuro_dev_admin_root") return false;
 
-    ensureFile(USERS_FILE, "[]");
-    const data = fs.readFileSync(USERS_FILE, "utf-8");
-    const users: User[] = JSON.parse(data || "[]");
-    const target = users.find((u) => u.id === userId);
-    const filtered = users.filter((u) => u.id !== userId);
+    const target = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, username: true },
+    });
+    if (!target) return false;
 
-    if (filtered.length !== users.length) {
-      atomicWriteJsonSync(USERS_FILE, filtered);
-      logAdminAction("Deleted User Account", "USERS", target?.username || userId, `Removed account permanently by ${actor}`, actor);
-      return true;
-    }
-    return false;
+    await prisma.user.delete({ where: { id: userId } });
+    await logAdminAction(
+      "Deleted User Account",
+      "USERS",
+      target.username || userId,
+      `Removed account permanently by ${actor}`,
+      actor
+    );
+    return true;
   } catch (error) {
     console.error("Failed to delete user:", error);
     return false;
   }
 }
-

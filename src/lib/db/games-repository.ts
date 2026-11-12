@@ -1,29 +1,14 @@
-import path from "path";
-import { DbLibrarySlot, DbDeveloperStudio } from "./types";
-import { safeReadJsonSync, atomicWriteJsonSync } from "./atomic-store";
+import prisma from "@/lib/prisma";
+import {
+  getLibraryGames,
+  updateLibraryGameSlot,
+  getDevelopers,
+  updateDeveloper,
+} from "@/lib/library-store";
 import { GAMES_DATA, Game } from "@/lib/games";
-
-const LIBRARY_FILE = path.join(process.cwd(), "src", "data", "library-games.json");
-const DEVELOPERS_FILE = path.join(process.cwd(), "src", "data", "developers.json");
-
-function readLibrarySlots(): DbLibrarySlot[] {
-  return safeReadJsonSync<DbLibrarySlot[]>(LIBRARY_FILE, []);
-}
-
-function writeLibrarySlots(slots: DbLibrarySlot[]): void {
-  atomicWriteJsonSync(LIBRARY_FILE, slots);
-}
-
-function readDevelopers(): DbDeveloperStudio[] {
-  return safeReadJsonSync<DbDeveloperStudio[]>(DEVELOPERS_FILE, []);
-}
-
-function writeDevelopers(devs: DbDeveloperStudio[]): void {
-  atomicWriteJsonSync(DEVELOPERS_FILE, devs);
-}
+import { DbLibrarySlot, DbDeveloperStudio } from "./types";
 
 export const GamesRepository = {
-  // ─── CATALOGUE GAMES ──────────────────────────────────────────────────────
   async getCatalogueGames(params?: {
     category?: string;
     query?: string;
@@ -60,37 +45,37 @@ export const GamesRepository = {
   },
 
   async getGameById(id: string): Promise<Game | null> {
-    const game = GAMES_DATA.find((g) => g.id === id);
-    return game || null;
+    return GAMES_DATA.find((g) => g.id === id) || null;
   },
 
-  // ─── CARTRIDGE VAULT SLOTS ────────────────────────────────────────────────
   async getLibrarySlots(category?: string): Promise<DbLibrarySlot[]> {
-    const slots = readLibrarySlots();
+    const slots = await getLibraryGames();
+    const mapped: DbLibrarySlot[] = slots.map((s) => ({
+      id: s.id,
+      category: s.category,
+      slotNumber: s.slotNumber,
+      title: s.title,
+      tagline: s.tagline,
+      description: s.description,
+      coverImage: s.coverImage,
+      badge: s.badge,
+      accentColor: s.accentColor,
+      progressPercent: s.progressPercent,
+      developer: s.developer,
+      isEmpty: s.isEmpty,
+      updatedAt: new Date().toISOString(),
+    }));
+
     if (category && category !== "All") {
       const catLower = category.toLowerCase();
-      return slots.filter((s) => s.category.toLowerCase() === catLower);
+      return mapped.filter((s) => s.category.toLowerCase() === catLower);
     }
-    return slots;
+    return mapped;
   },
 
   async updateLibrarySlot(updatedSlot: DbLibrarySlot): Promise<DbLibrarySlot> {
-    const slots = readLibrarySlots();
-    const index = slots.findIndex((s) => s.id === updatedSlot.id);
-
-    const slotToSave = {
-      ...updatedSlot,
-      updatedAt: new Date().toISOString(),
-    };
-
-    if (index !== -1) {
-      slots[index] = slotToSave;
-    } else {
-      slots.push(slotToSave);
-    }
-
-    writeLibrarySlots(slots);
-    return slotToSave;
+    await updateLibraryGameSlot(updatedSlot);
+    return { ...updatedSlot, updatedAt: new Date().toISOString() };
   },
 
   async clearLibrarySlot(slotId: string, category: string): Promise<DbLibrarySlot> {
@@ -109,50 +94,62 @@ export const GamesRepository = {
       isEmpty: true,
       updatedAt: new Date().toISOString(),
     };
-
-    return this.updateLibrarySlot(cleared);
+    await updateLibraryGameSlot(cleared);
+    return cleared;
   },
 
-  // ─── DEVELOPER PARTNER STUDIOS ────────────────────────────────────────────
   async getDevelopers(tier?: string): Promise<DbDeveloperStudio[]> {
-    const devs = readDevelopers();
+    const devs = await getDevelopers();
+    const mapped: DbDeveloperStudio[] = devs.map((d) => ({
+      id: d.id,
+      slug: d.name.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+      name: d.name,
+      tagline: d.tagline,
+      icon: d.icon,
+      genre: d.genre,
+      headquarters: d.headquarters,
+      description: d.description,
+      gamesCount: d.gamesCount,
+      partnerTier: d.partnerTier,
+      website: d.website,
+      showInTicker: d.showInTicker,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }));
     if (tier && tier !== "All") {
-      return devs.filter((d) => d.partnerTier === tier);
+      return mapped.filter((d) => d.partnerTier === tier);
     }
-    return devs;
+    return mapped;
   },
 
   async getDeveloperById(id: string): Promise<DbDeveloperStudio | null> {
-    const devs = readDevelopers();
+    const devs = await this.getDevelopers();
     return devs.find((d) => d.id === id) || null;
   },
 
   async updateDeveloper(dev: DbDeveloperStudio): Promise<DbDeveloperStudio> {
-    const devs = readDevelopers();
-    const index = devs.findIndex((d) => d.id === dev.id);
-
-    const devToSave = {
-      ...dev,
-      updatedAt: new Date().toISOString(),
-    };
-
-    if (index !== -1) {
-      devs[index] = devToSave;
-    } else {
-      devs.push(devToSave);
-    }
-
-    writeDevelopers(devs);
-    return devToSave;
+    await updateDeveloper({
+      id: dev.id,
+      name: dev.name,
+      tagline: dev.tagline || "",
+      icon: dev.icon,
+      genre: dev.genre,
+      headquarters: dev.headquarters,
+      description: dev.description,
+      gamesCount: dev.gamesCount,
+      partnerTier: dev.partnerTier,
+      website: dev.website || "",
+      showInTicker: dev.showInTicker,
+    });
+    return { ...dev, updatedAt: new Date().toISOString() };
   },
 
   async deleteDeveloper(id: string): Promise<boolean> {
-    const devs = readDevelopers();
-    const filtered = devs.filter((d) => d.id !== id);
-    if (filtered.length === devs.length) return false;
-
-    writeDevelopers(filtered);
-    return true;
+    try {
+      await prisma.developerStudio.delete({ where: { id } });
+      return true;
+    } catch {
+      return false;
+    }
   },
 };
-

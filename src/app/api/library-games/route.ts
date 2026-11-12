@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const category = searchParams.get("category");
     const occupiedOnly = searchParams.get("occupiedOnly") === "true";
-    let games = getLibraryGames();
+    let games = await getLibraryGames();
 
     if (category) {
       games = games.filter((g) => g.category.toLowerCase() === category.toLowerCase());

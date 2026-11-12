@@ -13,7 +13,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { AnalyticsChart } from "@/components/admin/AnalyticsChart";
-import { LibraryGameSlot } from "@/lib/library-store";
+import type { LibraryGameSlot } from "@/lib/library-store";
 import { AnalyticsSummary, PlatformEvent } from "@/lib/analytics/types";
 
 interface AnalyticsTabProps {

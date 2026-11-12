@@ -74,9 +74,9 @@ export async function POST(req: NextRequest) {
     }
 
     // Allow login with either email or gamertag
-    let user = findUserByEmail(loginId);
+    let user = await findUserByEmail(loginId);
     if (!user) {
-      user = findUserByUsername(loginId);
+      user = await findUserByUsername(loginId);
     }
 
     // 3. User not found: execute dummy scrypt computation to neutralize side-channel timing attacks
@@ -138,15 +138,16 @@ export async function POST(req: NextRequest) {
     recordSuccessfulLogin(loginId);
 
     // Track genuine login event
-    trackEvent({
+    await trackEvent({
       eventType: "user.login",
       category: "auth",
       userId: user.id,
+      clientIp,
       metadata: { username: user.username },
     });
 
     // 6. Create session with client metadata
-    const sessionToken = createSession(user.id, req);
+    const sessionToken = await createSession(user.id, req);
     const safeUser = toSafeUser(user);
 
     const response = NextResponse.json(

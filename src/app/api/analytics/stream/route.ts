@@ -17,19 +17,30 @@ export async function GET(req: NextRequest) {
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({
-    start(controller) {
+    async start(controller) {
+      let closed = false;
+
       // 1. Send initial analytics snapshot
-      const initialSummary = calculateAnalyticsSummary("7D");
-      controller.enqueue(
-        encoder.encode(`event: snapshot\ndata: ${JSON.stringify(initialSummary)}\n\n`)
-      );
+      try {
+        const initialSummary = await calculateAnalyticsSummary("7D");
+        if (!closed) {
+          controller.enqueue(
+            encoder.encode(`event: snapshot\ndata: ${JSON.stringify(initialSummary)}\n\n`)
+          );
+        }
+      } catch {
+        // Ignore initial snapshot error if closed
+      }
 
       // 2. Listener for live platform events
-      const onEvent = (event: PlatformEvent) => {
+      const onEvent = async (event: PlatformEvent) => {
+        if (closed) return;
         try {
+          const freshSummary = await calculateAnalyticsSummary("7D");
+          if (closed) return;
           const payload = {
             event,
-            freshSummary: calculateAnalyticsSummary("7D"),
+            freshSummary,
           };
           controller.enqueue(
             encoder.encode(`event: update\ndata: ${JSON.stringify(payload)}\n\n`)
@@ -43,6 +54,10 @@ export async function GET(req: NextRequest) {
 
       // 3. Heartbeat ping to prevent connection timeout
       const pingInterval = setInterval(() => {
+        if (closed) {
+          clearInterval(pingInterval);
+          return;
+        }
         try {
           controller.enqueue(encoder.encode(`event: heartbeat\ndata: ping\n\n`));
         } catch {
@@ -52,6 +67,7 @@ export async function GET(req: NextRequest) {
 
       // 4. Cleanup when client disconnects
       req.signal.addEventListener("abort", () => {
+        closed = true;
         clearInterval(pingInterval);
         analyticsEventBus.off("event", onEvent);
         try {

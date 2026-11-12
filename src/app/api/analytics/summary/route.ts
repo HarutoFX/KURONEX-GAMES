@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
       ? rangeParam
       : "7D";
 
-    const summary = calculateAnalyticsSummary(timeRange);
+    const summary = await calculateAnalyticsSummary(timeRange);
 
     return NextResponse.json(summary, {
       status: 200,

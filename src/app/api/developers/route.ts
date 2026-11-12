@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const tier = searchParams.get("tier");
     const genre = searchParams.get("genre");
-    let developers = getDevelopers();
+    let developers = await getDevelopers();
 
     if (tier) {
       developers = developers.filter((d) => d.partnerTier.toLowerCase() === tier.toLowerCase());

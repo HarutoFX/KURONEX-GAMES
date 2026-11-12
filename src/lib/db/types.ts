@@ -1,10 +1,20 @@
+export type DbUserRole =
+  | "player"
+  | "developer"
+  | "analyst"
+  | "content_manager"
+  | "game_manager"
+  | "moderator"
+  | "admin"
+  | "super_admin";
+
 export interface DbUser {
   id: string;
   username: string;
   email: string;
   passwordHash: string;
   salt: string;
-  role: "player" | "developer" | "admin";
+  role: DbUserRole;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;

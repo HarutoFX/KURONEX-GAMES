@@ -21,6 +21,7 @@ export default function DownloadPage() {
   const [emailInput, setEmailInput] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [ticket, setTicket] = useState<WaitlistEntryDto | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   const handleNotifySubmit = async (e: React.FormEvent) => {
@@ -28,16 +29,18 @@ export default function DownloadPage() {
     if (!emailInput.trim()) return;
 
     setIsSubmitting(true);
+    setErrorMsg(null);
     try {
       const res = await downloadsService.joinWaitlist({
         email: emailInput.trim(),
         platform: selectedOS,
+        source: "download",
       });
       if (res.entry) {
         setTicket(res.entry);
       }
     } catch (err) {
-      console.error("Waitlist error:", err);
+      setErrorMsg(err instanceof Error ? err.message : "Could not join waitlist. Please verify your email.");
     } finally {
       setIsSubmitting(false);
     }
@@ -231,25 +234,30 @@ export default function DownloadPage() {
                   </p>
                 </div>
               ) : (
-                <form onSubmit={handleNotifySubmit} className="flex flex-col sm:flex-row items-center gap-3 w-full max-w-md">
-                  <input
-                    type="email"
-                    required
-                    value={emailInput}
-                    onChange={(e) => setEmailInput(e.target.value)}
-                    placeholder="Enter email to get notified..."
-                    className="w-full rounded-xl border border-[#292929] bg-[#181818] px-4 py-2.5 text-xs sm:text-sm text-white placeholder-[#929292] outline-none transition focus:border-[#FF263D]"
-                  />
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    isLoading={isSubmitting}
-                    className="w-full sm:w-auto shrink-0"
-                  >
-                    <span>Get Notified</span>
-                    <ArrowRight className="h-3.5 w-3.5" />
-                  </Button>
-                </form>
+                <div className="w-full max-w-md space-y-2">
+                  <form onSubmit={handleNotifySubmit} className="flex flex-col sm:flex-row items-center gap-3 w-full">
+                    <input
+                      type="email"
+                      required
+                      value={emailInput}
+                      onChange={(e) => setEmailInput(e.target.value)}
+                      placeholder="Enter email to get notified..."
+                      className="w-full rounded-xl border border-[#292929] bg-[#181818] px-4 py-2.5 text-xs sm:text-sm text-white placeholder-[#929292] outline-none transition focus:border-[#FF263D]"
+                    />
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      isLoading={isSubmitting}
+                      className="w-full sm:w-auto shrink-0"
+                    >
+                      <span>Get Notified</span>
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </Button>
+                  </form>
+                  {errorMsg && (
+                    <p className="text-xs text-[#FF4054] text-left">{errorMsg}</p>
+                  )}
+                </div>
               )}
             </div>
           </div>

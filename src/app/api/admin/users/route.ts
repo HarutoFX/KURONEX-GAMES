@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
-    const users = getAllUsers();
+    const users = await getAllUsers();
     return NextResponse.json({ users }, { status: 200 });
   } catch (error) {
     console.error("Admin users GET error:", error);
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Resolve target user record to inspect current role
-    const targetUser = findUserById(userId);
+    const targetUser = await findUserById(userId);
 
     // ─── ACTION: UPDATE ROLE ────────────────────────────────────────────────
     if (action === "updateRole") {
@@ -90,13 +90,13 @@ export async function POST(req: NextRequest) {
       }
 
       // Support saving in canonical format
-      const ok = updateUserRole(userId, roleStrLower, auth.user.username);
+      const ok = await updateUserRole(userId, roleStrLower, auth.user.username);
       if (!ok) {
         return NextResponse.json({ error: "User not found or role update rejected." }, { status: 400 });
       }
 
       return NextResponse.json(
-        { message: `User role updated to ${role} successfully`, users: getAllUsers() },
+        { message: `User role updated to ${role} successfully`, users: await getAllUsers() },
         { status: 200 }
       );
     }
@@ -132,13 +132,13 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const ok = deleteUser(userId, auth.user.username);
+      const ok = await deleteUser(userId, auth.user.username);
       if (!ok) {
         return NextResponse.json({ error: "User not found or deletion rejected." }, { status: 400 });
       }
 
       return NextResponse.json(
-        { message: "User account deleted successfully", users: getAllUsers() },
+        { message: "User account deleted successfully", users: await getAllUsers() },
         { status: 200 }
       );
     }
@@ -175,7 +175,7 @@ export async function POST(req: NextRequest) {
       }
 
       const isSuspended = typeof suspended === "boolean" ? suspended : true;
-      const ok = suspendUserAccount(userId, isSuspended, typeof reason === "string" ? reason : "", auth.user.username);
+      const ok = await suspendUserAccount(userId, isSuspended, typeof reason === "string" ? reason : "", auth.user.username);
       if (!ok) {
         return NextResponse.json({ error: "User not found or suspension rejected." }, { status: 400 });
       }
@@ -183,7 +183,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           message: isSuspended ? "User account suspended and all active sessions revoked." : "User account reactivated successfully.",
-          users: getAllUsers(),
+          users: await getAllUsers(),
         },
         { status: 200 }
       );

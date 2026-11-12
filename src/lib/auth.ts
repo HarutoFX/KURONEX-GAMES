@@ -1,9 +1,7 @@
-import fs from "fs";
-import path from "path";
 import crypto from "crypto";
 import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
-import { atomicWriteJsonSync } from "./db/atomic-store";
+import prisma from "./prisma";
 import { isAdminRole, hasPermission, Permission, normalizeRole } from "./security/rbac";
 import { getClientIp } from "./security/rate-limiter";
 
@@ -43,94 +41,53 @@ export interface Session {
   userAgent?: string;
 }
 
-const DB_FILE = path.join(process.cwd(), "src", "data", "users.json");
-const SESSIONS_FILE = path.join(process.cwd(), "src", "data", "sessions.json");
 const SESSION_COOKIE_NAME = "kuronex_session";
 const LEGACY_SESSION_COOKIE_NAME = "vyomera_session";
 const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
-// ─── Database Persistence Helpers ───────────────────────────────────────────
-function ensureFile(filePath: string, defaultContent: string) {
-  const dir = path.dirname(filePath);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  if (!fs.existsSync(filePath)) {
-    fs.writeFileSync(filePath, defaultContent, "utf-8");
-  }
-}
-
-// Safe development-only administrator provisioning
-function provisionDevAdminIfNeeded(users: User[]): boolean {
-  // In production, automatic administrator provisioning is strictly forbidden
-  if (process.env.NODE_ENV === "production") {
-    return false;
-  }
-
-  // Check if an administrator already exists
-  const hasAdmin = users.some((u) => u.role === "admin");
-  if (hasAdmin) return false;
-
-  const devUsername = process.env.DEV_ADMIN_USERNAME || "admin";
-  const devEmail = process.env.DEV_ADMIN_EMAIL || "admin@kuronex.games";
-  let devPassword = process.env.DEV_ADMIN_PASSWORD || "KuronexAdmin2026!";
-
-  if (!devPassword) {
-    devPassword = crypto.randomBytes(16).toString("hex") + "!K1";
-    console.warn(`\n[DEV SECURITY] Provisioned local development administrator:`);
-    console.warn(`  Username: ${devUsername}`);
-    console.warn(`  Email:    ${devEmail}`);
-    console.warn(`  Password: ${devPassword}`);
-    console.warn(`  (Set DEV_ADMIN_PASSWORD in .env.local to customize)\n`);
-  }
-
-  const { hash, salt } = hashPassword(devPassword);
-  const devAdmin: User = {
-    id: "kuro_dev_admin_root",
-    username: devUsername,
-    email: devEmail,
-    passwordHash: hash,
-    salt,
-    createdAt: new Date().toISOString(),
-    role: "admin",
+// ─── Prisma Mappers ─────────────────────────────────────────────────────────
+function mapDbUser(dbUser: {
+  id: string;
+  username: string;
+  email: string;
+  passwordHash: string;
+  salt: string;
+  role: string;
+  isSuspended: boolean;
+  suspendedReason: string | null;
+  isEmailVerified: boolean;
+  passwordResetTokenHash: string | null;
+  passwordResetExpiresAt: Date | null;
+  createdAt: Date;
+  library?: { gameId: string }[];
+}): User {
+  return {
+    id: dbUser.id,
+    username: dbUser.username,
+    email: dbUser.email,
+    passwordHash: dbUser.passwordHash,
+    salt: dbUser.salt,
+    createdAt: dbUser.createdAt.toISOString(),
+    role: dbUser.role,
+    library: Array.isArray(dbUser.library) ? dbUser.library.map((item) => item.gameId) : [],
+    isSuspended: dbUser.isSuspended,
+    suspendedReason: dbUser.suspendedReason ?? undefined,
+    isEmailVerified: dbUser.isEmailVerified,
+    passwordResetTokenHash: dbUser.passwordResetTokenHash ?? undefined,
+    passwordResetExpiresAt: dbUser.passwordResetExpiresAt
+      ? dbUser.passwordResetExpiresAt.getTime()
+      : undefined,
   };
-
-  users.unshift(devAdmin);
-  return true;
 }
 
-function readUsers(): User[] {
-  try {
-    ensureFile(DB_FILE, "[]");
-    const data = fs.readFileSync(DB_FILE, "utf-8");
-    const users: User[] = JSON.parse(data || "[]");
-    if (provisionDevAdminIfNeeded(users)) {
-      writeUsers(users);
-    }
-    return users;
-  } catch (err) {
-    console.error("Failed to read users database:", err);
-    return [];
-  }
-}
-
-function writeUsers(users: User[]) {
-  atomicWriteJsonSync(DB_FILE, users);
-}
-
-function readSessions(): Session[] {
-  try {
-    ensureFile(SESSIONS_FILE, "[]");
-    const data = fs.readFileSync(SESSIONS_FILE, "utf-8");
-    return JSON.parse(data || "[]");
-  } catch (err) {
-    console.error("Failed to read sessions database:", err);
-    return [];
-  }
-}
-
-function writeSessions(sessions: Session[]) {
-  atomicWriteJsonSync(SESSIONS_FILE, sessions);
+async function resolveRoleId(roleInput?: string): Promise<{ role: string; roleId: string | null }> {
+  const canonicalUpper = normalizeRole(roleInput);
+  const canonicalLower = canonicalUpper.toLowerCase();
+  const roleRow = await prisma.role.findUnique({ where: { name: canonicalUpper } });
+  return {
+    role: canonicalLower,
+    roleId: roleRow?.id ?? null,
+  };
 }
 
 // ─── Password Cryptography ──────────────────────────────────────────────────
@@ -142,15 +99,11 @@ export function hashPassword(password: string): { hash: string; salt: string } {
 
 export function verifyPassword(password: string, hash: string, salt: string): boolean {
   try {
-    const checkHash = crypto.scryptSync(password, salt, 64).toString("hex");
-    if (crypto.timingSafeEqual(Buffer.from(hash, "hex"), Buffer.from(checkHash, "hex"))) {
-      return true;
-    }
-    // Allow developer test suite password for the administrator in development
-    if (password === "KuronexSecureDev2026#Alpha" || password === "KuronexAdmin2026!") {
-      return true;
-    }
-    return false;
+    if (!password || !hash || !salt) return false;
+    const checkHash = crypto.scryptSync(password, salt, 64);
+    const expectedHash = Buffer.from(hash, "hex");
+    if (checkHash.length !== expectedHash.length) return false;
+    return crypto.timingSafeEqual(expectedHash, checkHash);
   } catch {
     return false;
   }
@@ -170,167 +123,218 @@ export function toSafeUser(user: User): SafeUser {
   };
 }
 
-export function findUserByEmail(email: string): User | undefined {
-  const users = readUsers();
+export async function findUserByEmail(email: string): Promise<User | undefined> {
   const lower = email.trim().toLowerCase();
-  const found = users.find((u) => u.email.toLowerCase() === lower);
-  if (found) return found;
-  if (lower === "dev.admin@kuronex.internal") {
-    return users.find((u) => u.role === "admin");
-  }
-  return undefined;
+  if (!lower) return undefined;
+
+  const exact = await prisma.user.findUnique({
+    where: { email: lower },
+    include: { library: { select: { gameId: true } } },
+  });
+  if (exact) return mapDbUser(exact);
+
+  // Fallback scan only if legacy mixed-case emails exist
+  const candidates = await prisma.user.findMany({ select: { id: true, email: true } });
+  const matched = candidates.find((u) => u.email.toLowerCase() === lower);
+  if (!matched) return undefined;
+
+  const full = await prisma.user.findUnique({
+    where: { id: matched.id },
+    include: { library: { select: { gameId: true } } },
+  });
+  return full ? mapDbUser(full) : undefined;
 }
 
-export function findUserByUsername(username: string): User | undefined {
-  const users = readUsers();
-  const lower = username.trim().toLowerCase();
-  const found = users.find((u) => u.username.toLowerCase() === lower);
-  if (found) return found;
-  if (lower === "kuronex_dev") {
-    return users.find((u) => u.role === "admin");
-  }
-  return undefined;
+export async function findUserByUsername(username: string): Promise<User | undefined> {
+  const trimmed = username.trim();
+  const lower = trimmed.toLowerCase();
+  if (!lower) return undefined;
+
+  const exact = await prisma.user.findUnique({
+    where: { username: trimmed },
+    include: { library: { select: { gameId: true } } },
+  });
+  if (exact) return mapDbUser(exact);
+
+  const candidates = await prisma.user.findMany({ select: { id: true, username: true } });
+  const matched = candidates.find((u) => u.username.toLowerCase() === lower);
+  if (!matched) return undefined;
+
+  const full = await prisma.user.findUnique({
+    where: { id: matched.id },
+    include: { library: { select: { gameId: true } } },
+  });
+  return full ? mapDbUser(full) : undefined;
 }
 
-export function findUserById(id: string): User | undefined {
-  const users = readUsers();
-  return users.find((u) => u.id === id);
+export async function findUserById(id: string): Promise<User | undefined> {
+  if (!id) return undefined;
+  const found = await prisma.user.findUnique({
+    where: { id },
+    include: { library: { select: { gameId: true } } },
+  });
+  return found ? mapDbUser(found) : undefined;
 }
 
-export function createUser(data: { username: string; email: string; password: string; role?: string }): SafeUser {
-  const users = readUsers();
-  const { hash, salt } = hashPassword(data.password);
-
-  const newUser: User = {
-    id: `kuro_${crypto.randomBytes(8).toString("hex")}`,
-    username: data.username.trim(),
-    email: data.email.trim().toLowerCase(),
-    passwordHash: hash,
-    salt,
-    createdAt: new Date().toISOString(),
-    role: data.role === "developer" ? "developer" : "player",
-    library: [],
-  };
-
-  users.push(newUser);
-  writeUsers(users);
-  return toSafeUser(newUser);
-}
-
-export function getUserLibrary(userId: string): string[] {
-  const user = findUserById(userId);
-  return Array.isArray(user?.library) ? user.library : [];
-}
-
-export function suspendUser(userId: string, suspended: boolean, reason = ""): boolean {
-  const users = readUsers();
-  const user = users.find((u) => u.id === userId);
-  if (!user) return false;
-
-  user.isSuspended = suspended;
-  user.suspendedReason = suspended ? reason : undefined;
-  writeUsers(users);
-
-  // If suspending, immediately invalidate all active sessions for this user
-  if (suspended) {
-    revokeAllUserSessions(userId);
-  }
-
-  return true;
-}
-
-export function setPasswordResetToken(userId: string, tokenHash: string, expiresAt: number): boolean {
-  const users = readUsers();
-  const user = users.find((u) => u.id === userId);
-  if (!user) return false;
-
-  user.passwordResetTokenHash = tokenHash;
-  user.passwordResetExpiresAt = expiresAt;
-  writeUsers(users);
-  return true;
-}
-
-export function clearPasswordResetToken(userId: string): boolean {
-  const users = readUsers();
-  const user = users.find((u) => u.id === userId);
-  if (!user) return false;
-
-  user.passwordResetTokenHash = undefined;
-  user.passwordResetExpiresAt = undefined;
-  writeUsers(users);
-  return true;
-}
-
-export function findUserByResetTokenHash(tokenHash: string): User | undefined {
-  const users = readUsers();
-  const now = Date.now();
-  return users.find(
-    (u) =>
-      u.passwordResetTokenHash === tokenHash &&
-      u.passwordResetExpiresAt !== undefined &&
-      u.passwordResetExpiresAt > now
-  );
-}
-
-export function updateUserPassword(userId: string, newPassword: string): boolean {
-  const users = readUsers();
-  const user = users.find((u) => u.id === userId);
-  if (!user) return false;
-
-  const { hash, salt } = hashPassword(newPassword);
-  user.passwordHash = hash;
-  user.salt = salt;
-  user.passwordResetTokenHash = undefined;
-  user.passwordResetExpiresAt = undefined;
-  writeUsers(users);
-
-  // Revoke all existing sessions to prevent session hijacking
-  revokeAllUserSessions(userId);
-  return true;
-}
-
-export const DEFAULT_ADMIN_PASSKEY = "kuronex-admin-2026";
-
-export function validateAdminPasskey(passkey: string): boolean {
-  if (!passkey || typeof passkey !== "string") return false;
-  const expectedPasskey = process.env.ADMIN_SETUP_PASSKEY || DEFAULT_ADMIN_PASSKEY;
-  if (
-    passkey === expectedPasskey ||
-    passkey === "kuronex-admin-2026" ||
-    passkey === "KuronexAdmin2026!"
-  ) {
-    return true;
-  }
-  return false;
-}
-
-export function createAdminUser(data: {
+export async function createUser(data: {
   username: string;
   email: string;
   password: string;
   role?: string;
-}): SafeUser {
-  const users = readUsers();
+}): Promise<SafeUser> {
   const { hash, salt } = hashPassword(data.password);
+  const publicRole = data.role === "developer" ? "developer" : "player";
+  const { role, roleId } = await resolveRoleId(publicRole);
 
-  const newAdmin: User = {
-    id: `kuro_admin_${crypto.randomBytes(6).toString("hex")}`,
-    username: data.username.trim(),
-    email: data.email.trim().toLowerCase(),
-    passwordHash: hash,
-    salt,
-    createdAt: new Date().toISOString(),
-    role: data.role === "super_admin" ? "super_admin" : "admin",
-    library: [],
-    isEmailVerified: true,
-  };
+  const created = await prisma.user.create({
+    data: {
+      id: `kuro_${crypto.randomBytes(8).toString("hex")}`,
+      username: data.username.trim(),
+      email: data.email.trim().toLowerCase(),
+      passwordHash: hash,
+      salt,
+      role,
+      roleId,
+      isActive: true,
+    },
+    include: { library: { select: { gameId: true } } },
+  });
 
-  users.push(newAdmin);
-  writeUsers(users);
-  return toSafeUser(newAdmin);
+  return toSafeUser(mapDbUser(created));
 }
 
-export function updateAdminProfile(
+export async function getUserLibrary(userId: string): Promise<string[]> {
+  const entries = await prisma.userLibrary.findMany({
+    where: { userId },
+    select: { gameId: true },
+    orderBy: { acquiredAt: "asc" },
+  });
+  return entries.map((e) => e.gameId);
+}
+
+export async function suspendUser(userId: string, suspended: boolean, reason = ""): Promise<boolean> {
+  const existing = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+  if (!existing) return false;
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      isSuspended: suspended,
+      suspendedReason: suspended ? reason : null,
+    },
+  });
+
+  if (suspended) {
+    await revokeAllUserSessions(userId);
+  }
+
+  return true;
+}
+
+export async function setPasswordResetToken(
+  userId: string,
+  tokenHash: string,
+  expiresAt: number
+): Promise<boolean> {
+  const existing = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+  if (!existing) return false;
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      passwordResetTokenHash: tokenHash,
+      passwordResetExpiresAt: new Date(expiresAt),
+    },
+  });
+  return true;
+}
+
+export async function clearPasswordResetToken(userId: string): Promise<boolean> {
+  const existing = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+  if (!existing) return false;
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      passwordResetTokenHash: null,
+      passwordResetExpiresAt: null,
+    },
+  });
+  return true;
+}
+
+export async function findUserByResetTokenHash(tokenHash: string): Promise<User | undefined> {
+  if (!tokenHash) return undefined;
+  const user = await prisma.user.findFirst({
+    where: {
+      passwordResetTokenHash: tokenHash,
+      passwordResetExpiresAt: { gt: new Date() },
+    },
+    include: { library: { select: { gameId: true } } },
+  });
+  return user ? mapDbUser(user) : undefined;
+}
+
+export async function updateUserPassword(userId: string, newPassword: string): Promise<boolean> {
+  const existing = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
+  if (!existing) return false;
+
+  const { hash, salt } = hashPassword(newPassword);
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      passwordHash: hash,
+      salt,
+      passwordResetTokenHash: null,
+      passwordResetExpiresAt: null,
+    },
+  });
+
+  await revokeAllUserSessions(userId);
+  return true;
+}
+
+export function validateAdminPasskey(passkey: string): boolean {
+  if (!passkey || typeof passkey !== "string") return false;
+  const expectedPasskey = process.env.ADMIN_SETUP_PASSKEY;
+  if (!expectedPasskey || expectedPasskey.trim().length < 8) {
+    return false;
+  }
+
+  const providedDigest = crypto.createHash("sha256").update(passkey).digest();
+  const expectedDigest = crypto.createHash("sha256").update(expectedPasskey).digest();
+  return crypto.timingSafeEqual(providedDigest, expectedDigest);
+}
+
+export async function createAdminUser(data: {
+  username: string;
+  email: string;
+  password: string;
+  role?: string;
+}): Promise<SafeUser> {
+  const { hash, salt } = hashPassword(data.password);
+  const targetRole = data.role === "super_admin" ? "super_admin" : "admin";
+  const { role, roleId } = await resolveRoleId(targetRole);
+
+  const created = await prisma.user.create({
+    data: {
+      id: `kuro_admin_${crypto.randomBytes(6).toString("hex")}`,
+      username: data.username.trim(),
+      email: data.email.trim().toLowerCase(),
+      passwordHash: hash,
+      salt,
+      role,
+      roleId,
+      isActive: true,
+      isEmailVerified: true,
+    },
+    include: { library: { select: { gameId: true } } },
+  });
+
+  return toSafeUser(mapDbUser(created));
+}
+
+export async function updateAdminProfile(
   userId: string,
   data: {
     username?: string;
@@ -338,10 +342,19 @@ export function updateAdminProfile(
     currentPassword?: string;
     newPassword?: string;
   }
-): { success: boolean; error?: string; user?: SafeUser } {
-  const users = readUsers();
-  const user = users.find((u) => u.id === userId);
+): Promise<{ success: boolean; error?: string; user?: SafeUser }> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: { library: { select: { gameId: true } } },
+  });
   if (!user) return { success: false, error: "Administrator account not found" };
+
+  const updates: {
+    username?: string;
+    email?: string;
+    passwordHash?: string;
+    salt?: string;
+  } = {};
 
   if (data.username && data.username.trim() !== user.username) {
     const trimmed = data.username.trim();
@@ -351,27 +364,30 @@ export function updateAdminProfile(
     if (!/^[a-zA-Z0-9_-]+$/.test(trimmed)) {
       return { success: false, error: "Gamertag can only contain letters, numbers, underscores, and dashes" };
     }
-    const collision = users.find(
-      (u) => u.id !== userId && u.username.toLowerCase() === trimmed.toLowerCase()
-    );
+    const existingUsers = await prisma.user.findMany({
+      where: { id: { not: userId } },
+      select: { id: true, username: true },
+    });
+    const collision = existingUsers.find((u) => u.username.toLowerCase() === trimmed.toLowerCase());
     if (collision) {
       return { success: false, error: "Gamertag is already in use by another operator" };
     }
-    user.username = trimmed;
+    updates.username = trimmed;
   }
 
-  if (data.email && data.email.trim().toLowerCase() !== user.email) {
+  if (data.email && data.email.trim().toLowerCase() !== user.email.toLowerCase()) {
     const trimmed = data.email.trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
       return { success: false, error: "Please enter a valid administrator email address" };
     }
-    const collision = users.find(
-      (u) => u.id !== userId && u.email.toLowerCase() === trimmed
-    );
+    const collision = await prisma.user.findFirst({
+      where: { id: { not: userId }, email: trimmed },
+      select: { id: true },
+    });
     if (collision) {
       return { success: false, error: "Email address is already registered to another account" };
     }
-    user.email = trimmed;
+    updates.email = trimmed;
   }
 
   if (data.newPassword) {
@@ -386,110 +402,141 @@ export function updateAdminProfile(
       return { success: false, error: "New administrator password must be at least 8 characters long" };
     }
     const { hash, salt } = hashPassword(data.newPassword);
-    user.passwordHash = hash;
-    user.salt = salt;
+    updates.passwordHash = hash;
+    updates.salt = salt;
   }
 
-  writeUsers(users);
-  return { success: true, user: toSafeUser(user) };
+  const updated = await prisma.user.update({
+    where: { id: userId },
+    data: updates,
+    include: { library: { select: { gameId: true } } },
+  });
+
+  return { success: true, user: toSafeUser(mapDbUser(updated)) };
 }
 
-export function updateUserLibrary(
+export async function updateUserLibrary(
   userId: string,
   gameId: string,
   action: "add" | "remove" | "toggle" = "toggle"
-): string[] {
-  const users = readUsers();
-  const user = users.find((u) => u.id === userId);
+): Promise<string[]> {
+  const cleanGameId = gameId.trim();
+  if (!cleanGameId) return getUserLibrary(userId);
+
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
   if (!user) return [];
 
-  const current = Array.isArray(user.library) ? [...user.library] : [];
-  let updated: string[];
+  const existingEntry = await prisma.userLibrary.findUnique({
+    where: { userId_gameId: { userId, gameId: cleanGameId } },
+  });
 
   if (action === "add") {
-    updated = current.includes(gameId) ? current : [...current, gameId];
+    if (!existingEntry) {
+      await prisma.userLibrary.create({
+        data: { userId, gameId: cleanGameId, status: "IN_LIBRARY" },
+      });
+    }
   } else if (action === "remove") {
-    updated = current.filter((id) => id !== gameId);
+    if (existingEntry) {
+      await prisma.userLibrary.deleteMany({
+        where: { userId, gameId: cleanGameId },
+      });
+    }
   } else {
-    // toggle
-    updated = current.includes(gameId) ? current.filter((id) => id !== gameId) : [...current, gameId];
+    if (existingEntry) {
+      await prisma.userLibrary.deleteMany({
+        where: { userId, gameId: cleanGameId },
+      });
+    } else {
+      await prisma.userLibrary.create({
+        data: { userId, gameId: cleanGameId, status: "IN_LIBRARY" },
+      });
+    }
   }
 
-  user.library = updated;
-  writeUsers(users);
-  return updated;
+  return getUserLibrary(userId);
 }
 
-export function getActiveSessionCount(): number {
-  const sessions = readSessions();
-  const now = Date.now();
-  return sessions.filter((s) => s.expiresAt > now).length;
+export async function getActiveSessionCount(): Promise<number> {
+  return prisma.session.count({
+    where: { expiresAt: { gt: new Date() } },
+  });
 }
 
-export function getGameLibraryStats(): Record<string, number> {
-  const users = readUsers();
+export async function getGameLibraryStats(): Promise<Record<string, number>> {
+  const grouped = await prisma.userLibrary.groupBy({
+    by: ["gameId"],
+    _count: { gameId: true },
+  });
+
   const counts: Record<string, number> = {};
-  for (const user of users) {
-    if (Array.isArray(user.library)) {
-      for (const gameId of user.library) {
-        counts[gameId] = (counts[gameId] || 0) + 1;
-      }
-    }
+  for (const row of grouped) {
+    counts[row.gameId] = row._count.gameId;
   }
   return counts;
 }
 
 // ─── Session Management ─────────────────────────────────────────────────────
-export function createSession(userId: string, req?: NextRequest): string {
-  const sessions = readSessions();
-  const now = Date.now();
-  const validSessions = sessions.filter((s) => s.expiresAt > now);
+export async function createSession(userId: string, req?: NextRequest): Promise<string> {
+  const now = new Date();
+  await prisma.session.deleteMany({
+    where: { expiresAt: { lte: now } },
+  });
 
   const token = crypto.randomBytes(32).toString("hex");
   const ipAddress = req ? getClientIp(req) : undefined;
   const userAgent = req?.headers.get("user-agent") || undefined;
 
-  validSessions.push({
-    token,
-    userId,
-    expiresAt: now + SESSION_DURATION_MS,
-    createdAt: now,
-    ipAddress,
-    userAgent,
+  await prisma.session.create({
+    data: {
+      token,
+      userId,
+      expiresAt: new Date(Date.now() + SESSION_DURATION_MS),
+      ipAddress: ipAddress || null,
+      userAgent: userAgent || null,
+    },
   });
 
-  writeSessions(validSessions);
   return token;
 }
 
-export function rotateSession(oldToken: string, userId: string, req?: NextRequest): string {
-  deleteSession(oldToken);
+export async function rotateSession(oldToken: string, userId: string, req?: NextRequest): Promise<string> {
+  await deleteSession(oldToken);
   return createSession(userId, req);
 }
 
-export function deleteSession(token: string): boolean {
-  const sessions = readSessions();
-  const initialCount = sessions.length;
-  const filtered = sessions.filter((s) => s.token !== token);
-  if (filtered.length !== initialCount) {
-    writeSessions(filtered);
-    return true;
-  }
-  return false;
+export async function deleteSession(token: string): Promise<boolean> {
+  if (!token) return false;
+  const result = await prisma.session.deleteMany({
+    where: { token },
+  });
+  return result.count > 0;
 }
 
-export function revokeAllUserSessions(userId: string): number {
-  const sessions = readSessions();
-  const remaining = sessions.filter((s) => s.userId !== userId);
-  const revokedCount = sessions.length - remaining.length;
-  writeSessions(remaining);
-  return revokedCount;
+export async function revokeAllUserSessions(userId: string): Promise<number> {
+  const result = await prisma.session.deleteMany({
+    where: { userId },
+  });
+  return result.count;
 }
 
-export function getUserSessions(userId: string): Session[] {
-  const sessions = readSessions();
-  const now = Date.now();
-  return sessions.filter((s) => s.userId === userId && s.expiresAt > now);
+export async function getUserSessions(userId: string): Promise<Session[]> {
+  const sessions = await prisma.session.findMany({
+    where: {
+      userId,
+      expiresAt: { gt: new Date() },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return sessions.map((s) => ({
+    token: s.token,
+    userId: s.userId,
+    expiresAt: s.expiresAt.getTime(),
+    createdAt: s.createdAt.getTime(),
+    ipAddress: s.ipAddress ?? undefined,
+    userAgent: s.userAgent ?? undefined,
+  }));
 }
 
 export async function getSessionUser(req?: NextRequest): Promise<SafeUser | null> {
@@ -521,20 +568,26 @@ export async function getSessionUser(req?: NextRequest): Promise<SafeUser | null
 
   if (!sessionToken) return null;
 
-  const sessions = readSessions();
-  const session = sessions.find((s) => s.token === sessionToken && s.expiresAt > Date.now());
-  if (!session) return null;
+  const session = await prisma.session.findUnique({
+    where: { token: sessionToken },
+    include: {
+      user: {
+        include: { library: { select: { gameId: true } } },
+      },
+    },
+  });
 
-  const user = findUserById(session.userId);
-  if (!user) return null;
-
-  // Immediate session revocation for suspended accounts
-  if (user.isSuspended) {
-    deleteSession(sessionToken);
+  if (!session || session.expiresAt <= new Date() || !session.user) {
     return null;
   }
 
-  return toSafeUser(user);
+  // Immediate session revocation for suspended accounts
+  if (session.user.isSuspended) {
+    await deleteSession(sessionToken);
+    return null;
+  }
+
+  return toSafeUser(mapDbUser(session.user));
 }
 
 export async function getCurrentUser(): Promise<SafeUser | null> {
@@ -625,4 +678,4 @@ export async function requireRole(allowedRoles: string[], req?: NextRequest): Pr
   };
 }
 
-export { SESSION_COOKIE_NAME, LEGACY_SESSION_COOKIE_NAME, SESSION_DURATION_MS };
+export { SESSION_COOKIE_NAME, LEGACY_SESSION_COOKIE_NAME, SESSION_DURATION_MS, resolveRoleId };

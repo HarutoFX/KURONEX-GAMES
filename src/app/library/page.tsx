@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { GradientText } from "@/components/ui/gradient-text";
 import { useAuth } from "@/context/AuthContext";
-import { LibraryGameSlot } from "@/lib/library-store";
+import type { LibraryGameSlot } from "@/lib/library-store";
 import { LargeLibraryCard } from "@/components/library/LargeLibraryCard";
 import { LargeLibraryCardSkeleton } from "@/components/library/LargeLibraryCardSkeleton";
 import { SiteNavbar, SiteFooter } from "@/components/ui/navigation";

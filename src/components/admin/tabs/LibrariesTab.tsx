@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { Edit3, X } from "lucide-react";
-import { LibraryGameSlot } from "@/lib/library-store";
+import type { LibraryGameSlot } from "@/lib/library-store";
 
 const CATEGORIES = ["Action", "RPG", "Sci-Fi", "Strategy", "Survival", "Shooter"] as const;
 

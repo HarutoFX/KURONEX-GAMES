@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
+import prisma from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
@@ -8,22 +7,27 @@ export async function GET() {
   const checks: Record<string, "ok" | "degraded" | "failed"> = {};
   let isReady = true;
 
-  // 1. Storage Readability Check
+  // 1. Database Connectivity & Readability Check
   try {
-    const usersFile = path.join(process.cwd(), "src", "data", "users.json");
-    fs.accessSync(usersFile, fs.constants.R_OK);
+    await prisma.$queryRawUnsafe("SELECT 1");
+    await prisma.user.count();
+    checks.database_read = "ok";
     checks.storage_read = "ok";
   } catch {
+    checks.database_read = "failed";
     checks.storage_read = "failed";
     isReady = false;
   }
 
-  // 2. Storage Directory Writability Check
+  // 2. Database Write Readiness Check (Transactional non-mutating check)
   try {
-    const dataDir = path.join(process.cwd(), "src", "data");
-    fs.accessSync(dataDir, fs.constants.W_OK);
+    await prisma.$transaction(async (tx) => {
+      await tx.$queryRawUnsafe("SELECT 1");
+    });
+    checks.database_write = "ok";
     checks.storage_write = "ok";
   } catch {
+    checks.database_write = "failed";
     checks.storage_write = "failed";
     isReady = false;
   }

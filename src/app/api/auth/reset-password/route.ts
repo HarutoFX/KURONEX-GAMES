@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     }
 
     const tokenHash = hashToken(token.trim());
-    const user = findUserByResetTokenHash(tokenHash);
+    const user = await findUserByResetTokenHash(tokenHash);
 
     if (!user) {
       return NextResponse.json(
@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Update password, clear token, and revoke all active sessions
-    updateUserPassword(user.id, newPassword);
+    await updateUserPassword(user.id, newPassword);
 
     return NextResponse.json(
       {

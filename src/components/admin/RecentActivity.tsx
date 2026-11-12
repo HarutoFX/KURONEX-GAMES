@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { Activity, Shield, Gamepad2, User, Cpu } from "lucide-react";
-import { AuditLog } from "@/lib/admin-store";
+import type { AuditLog } from "@/lib/admin-store";
 
 interface RecentActivityProps {
   logs: AuditLog[];

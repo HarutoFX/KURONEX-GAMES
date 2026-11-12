@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
-    const snapshot = getObservabilitySnapshot();
+    const snapshot = await getObservabilitySnapshot();
 
     return NextResponse.json(snapshot, {
       status: 200,

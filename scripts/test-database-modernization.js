@@ -155,18 +155,23 @@ async function runTests() {
     assert(fs.existsSync(p), `src/lib/db/${rf} exists`);
   }
 
-  // Verify atomic integration in existing stores
+  // Verify Prisma schema & client integration in runtime stores
+  const sqliteSchemaPath = path.join(process.cwd(), "prisma", "schema.sqlite.prisma");
+  assert(fs.existsSync(sqliteSchemaPath), "prisma/schema.sqlite.prisma exists for local SQLite dev");
+  const prismaSingletonPath = path.join(process.cwd(), "src", "lib", "prisma.ts");
+  assert(fs.existsSync(prismaSingletonPath), "src/lib/prisma.ts singleton exists");
+
   const authStoreContent = fs.readFileSync(path.join(process.cwd(), "src", "lib", "auth.ts"), "utf-8");
-  assert(authStoreContent.includes("atomicWriteJsonSync"), "src/lib/auth.ts uses atomicWriteJsonSync");
+  assert(authStoreContent.includes("prisma"), "src/lib/auth.ts is backed by Prisma");
 
   const adminStoreContent = fs.readFileSync(path.join(process.cwd(), "src", "lib", "admin-store.ts"), "utf-8");
-  assert(adminStoreContent.includes("atomicWriteJsonSync"), "src/lib/admin-store.ts uses atomicWriteJsonSync");
+  assert(adminStoreContent.includes("prisma"), "src/lib/admin-store.ts is backed by Prisma");
 
   const libraryStoreContent = fs.readFileSync(path.join(process.cwd(), "src", "lib", "library-store.ts"), "utf-8");
-  assert(libraryStoreContent.includes("atomicWriteJsonSync"), "src/lib/library-store.ts uses atomicWriteJsonSync");
+  assert(libraryStoreContent.includes("prisma"), "src/lib/library-store.ts is backed by Prisma");
 
   const downloadStoreContent = fs.readFileSync(path.join(process.cwd(), "src", "lib", "download-store.ts"), "utf-8");
-  assert(downloadStoreContent.includes("atomicWriteJsonSync"), "src/lib/download-store.ts uses atomicWriteJsonSync");
+  assert(downloadStoreContent.includes("prisma"), "src/lib/download-store.ts is backed by Prisma");
 
   // 6. STANDARDIZED API FRAMEWORK
   console.log("\n--- 6. Standardized API Framework ---");

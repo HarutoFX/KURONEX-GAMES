@@ -18,9 +18,11 @@ import {
   EyeOff,
 } from "lucide-react";
 import { GradientText } from "@/components/ui/gradient-text";
+import { useAuth } from "@/context/AuthContext";
 
 export default function AdminAuthPage() {
   const router = useRouter();
+  const { refreshUser } = useAuth();
 
   // Tab State: "login" | "register"
   const [activeTab, setActiveTab] = useState<"login" | "register">("login");
@@ -65,6 +67,7 @@ export default function AdminAuthPage() {
         throw new Error(data.error || "Authentication failed.");
       }
 
+      await refreshUser();
       setSuccessMsg("Administrator verified. Redirecting to management console...");
       setTimeout(() => {
         router.push("/admin");
@@ -118,6 +121,7 @@ export default function AdminAuthPage() {
         throw new Error(data.error || "Failed to provision administrator account.");
       }
 
+      await refreshUser();
       setSuccessMsg("Administrator account provisioned! Initializing command console...");
       setTimeout(() => {
         router.push("/admin");
@@ -130,7 +134,7 @@ export default function AdminAuthPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#080808] text-white flex flex-col justify-between selection:bg-[#FF263D]/25 selection:text-white">
+    <div className="min-h-screen bg-transparent text-white flex flex-col justify-between selection:bg-[#FF263D]/25 selection:text-white">
       {/* Top Brand Bar */}
       <header className="p-6 sm:px-12 flex items-center justify-between border-b border-[#35151C]/60 bg-[#100607]/70 backdrop-blur-md">
         <Link href="/" className="flex items-center gap-2.5 group">
@@ -335,7 +339,7 @@ export default function AdminAuthPage() {
                   </button>
                 </div>
                 <p className="text-[10px] text-[#A1A1AA] mt-1">
-                  Team master passkey: <code className="text-cyan-400 font-mono">kuronex-admin-2026</code>
+                  Passkey configured via server <code className="text-cyan-400 font-mono">ADMIN_SETUP_PASSKEY</code> environment variable.
                 </p>
               </div>
 

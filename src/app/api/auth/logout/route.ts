@@ -21,14 +21,14 @@ export async function POST(req: NextRequest) {
 
     if (revokeAll) {
       if (user) {
-        revokeAllUserSessions(user.id);
+        await revokeAllUserSessions(user.id);
       }
     } else if (sessionToken) {
-      deleteSession(sessionToken);
+      await deleteSession(sessionToken);
     }
 
     if (user) {
-      trackEvent({
+      await trackEvent({
         eventType: "user.logout",
         category: "auth",
         userId: user.id,

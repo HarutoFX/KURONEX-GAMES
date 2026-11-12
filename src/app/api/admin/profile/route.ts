@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const { username, email, currentPassword, newPassword } = body;
 
-    const result = updateAdminProfile(currentUser.id, {
+    const result = await updateAdminProfile(currentUser.id, {
       username,
       email,
       currentPassword,
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (!result.success) {
-      logAdminAction(
+      await logAdminAction(
         "ADMIN_PROFILE_UPDATE_FAILED",
         "SETTINGS",
         currentUser.id,
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
 
-    logAdminAction(
+    await logAdminAction(
       "ADMIN_PROFILE_UPDATED",
       "SETTINGS",
       currentUser.id,
