@@ -38,22 +38,25 @@ jobs:
       - name: 3. Install Dependencies
         run: npm ci --prefer-offline || npm install
 
-      - name: 4. Static TypeScript Verification
+      - name: 4. Generate SQLite Prisma Client
+        run: npm run db:generate
+
+      - name: 5. Static TypeScript Verification
         run: npm run typecheck
 
-      - name: 5. Code Style & ESLint
+      - name: 6. Code Style & ESLint
         run: npm run lint
 
-      - name: 6. Unit Test Suite Execution
+      - name: 7. Unit Test Suite Execution
         run: npm run test:unit
 
-      - name: 7. Next.js Production Build
+      - name: 8. Next.js Production Build
         run: npm run build
         env:
           NODE_ENV: production
           NEXT_TELEMETRY_DISABLED: 1
 
-      - name: 8. Start Background Production Server for Integration Testing
+      - name: 9. Start Background Production Server for Integration Testing
         run: |
           npm run start &
           npx wait-on http://localhost:3000/api/health --timeout 30000
@@ -61,13 +64,13 @@ jobs:
           NODE_ENV: production
           PORT: 3000
 
-      - name: 9. Comprehensive Integration, E2E & Observability Verification
+      - name: 10. Comprehensive Integration, E2E & Observability Verification
         run: node scripts/run-all-tests.js
         env:
           TEST_BASE_URL: http://localhost:3000
           NODE_ENV: production
 
-      - name: 10. Pipeline Status Summary
+      - name: 11. Pipeline Status Summary
         if: always()
         run: |
           echo "### Quality Gate Summary" >> $GITHUB_STEP_SUMMARY
