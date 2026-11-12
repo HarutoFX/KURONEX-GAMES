@@ -20,6 +20,10 @@ jobs:
     name: Code Quality, Verification & Production Build
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      DATABASE_URL: file:./kuronex-ci.db
+      ADMIN_SETUP_PASSKEY: kuronex-ci-admin-passkey
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
 
     strategy:
       matrix:
@@ -40,6 +44,11 @@ jobs:
 
       - name: 4. Generate SQLite Prisma Client
         run: npm run db:generate
+
+      - name: 4.1 Initialize & Seed SQLite Test Database
+        run: |
+          npm run db:push
+          npm run db:seed
 
       - name: 5. Static TypeScript Verification
         run: npm run typecheck
