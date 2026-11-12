@@ -11,14 +11,18 @@ import {
 } from "lucide-react";
 import { GradientText } from "@/components/ui/gradient-text";
 import { DeveloperMarquee } from "@/components/developers/DeveloperMarquee";
-import { DeveloperPartner } from "@/lib/library-store";
+import type { DeveloperPartner } from "@/lib/library-store";
 import { SiteNavbar, SiteFooter } from "@/components/ui/navigation";
 import { Button } from "@/components/ui/button";
+import { downloadsService } from "@/services/downloads.service";
 
 export function DiscoverPage({ hideNavbar = false }: { hideNavbar?: boolean }) {
   const [developers, setDevelopers] = useState<DeveloperPartner[]>([]);
   const [emailInput, setEmailInput] = useState("");
   const [isSubscribed, setIsSubscribed] = useState(false);
+  const [isSubscribing, setIsSubscribing] = useState(false);
+  const [subscribeError, setSubscribeError] = useState<string | null>(null);
+  const [queueInfo, setQueueInfo] = useState<{ queueNumber: number; vipToken: string } | null>(null);
 
   useEffect(() => {
     async function loadDevs() {
@@ -35,10 +39,25 @@ export function DiscoverPage({ hideNavbar = false }: { hideNavbar?: boolean }) {
     loadDevs();
   }, []);
 
-  const handleSubscribe = (e: React.FormEvent) => {
+  const handleSubscribe = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (emailInput.trim()) {
+    if (!emailInput.trim()) return;
+    setIsSubscribing(true);
+    setSubscribeError(null);
+    try {
+      const res = await downloadsService.joinWaitlist({
+        email: emailInput.trim(),
+        platform: "windows",
+        source: "discover",
+      });
+      if (res.entry) {
+        setQueueInfo({ queueNumber: res.entry.queueNumber, vipToken: res.entry.vipToken });
+      }
       setIsSubscribed(true);
+    } catch (err) {
+      setSubscribeError(err instanceof Error ? err.message : "Failed to join waitlist. Please try again.");
+    } finally {
+      setIsSubscribing(false);
     }
   };
 
@@ -177,27 +196,37 @@ export function DiscoverPage({ hideNavbar = false }: { hideNavbar?: boolean }) {
               {isSubscribed ? (
                 <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-6 py-3 text-xs font-bold text-emerald-400">
                   <Check className="h-4 w-4" />
-                  <span>You&apos;re queued! We will email you upon client launch.</span>
+                  <span>
+                    {queueInfo
+                      ? `Queued at #${queueInfo.queueNumber} (${queueInfo.vipToken}). We will email you upon client launch.`
+                      : "You're queued! We will email you upon client launch."}
+                  </span>
                 </div>
               ) : (
-                <form onSubmit={handleSubscribe} className="flex flex-col sm:flex-row items-center gap-3 w-full max-w-md">
-                  <input
-                    type="email"
-                    required
-                    value={emailInput}
-                    onChange={(e) => setEmailInput(e.target.value)}
-                    placeholder="Enter email for launch notification..."
-                    className="w-full rounded-xl border border-[#292929] bg-[#181818] px-4 py-2.5 text-xs sm:text-sm text-white placeholder-[#929292] outline-none transition focus:border-[#FF263D]"
-                  />
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    className="w-full sm:w-auto shrink-0"
-                  >
-                    <span>Notify Me</span>
-                    <ArrowRight className="h-3.5 w-3.5" />
-                  </Button>
-                </form>
+                <div className="w-full max-w-md space-y-2">
+                  <form onSubmit={handleSubscribe} className="flex flex-col sm:flex-row items-center gap-3 w-full">
+                    <input
+                      type="email"
+                      required
+                      value={emailInput}
+                      onChange={(e) => setEmailInput(e.target.value)}
+                      placeholder="Enter email for launch notification..."
+                      className="w-full rounded-xl border border-[#292929] bg-[#181818] px-4 py-2.5 text-xs sm:text-sm text-white placeholder-[#929292] outline-none transition focus:border-[#FF263D]"
+                    />
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      isLoading={isSubscribing}
+                      className="w-full sm:w-auto shrink-0"
+                    >
+                      <span>Notify Me</span>
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </Button>
+                  </form>
+                  {subscribeError && (
+                    <p className="text-xs text-[#FF4054] text-left">{subscribeError}</p>
+                  )}
+                </div>
               )}
             </div>
           </div>

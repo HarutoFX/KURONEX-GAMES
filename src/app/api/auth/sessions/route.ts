@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
       req.cookies.get(SESSION_COOKIE_NAME)?.value ||
       req.cookies.get(LEGACY_SESSION_COOKIE_NAME)?.value;
 
-    const rawSessions = getUserSessions(user.id);
+    const rawSessions = await getUserSessions(user.id);
 
     // Sanitize sessions before sending to client: mask tokens to prevent leakage
     const sanitizedSessions = rawSessions.map((s, index) => ({
@@ -60,11 +60,11 @@ export async function DELETE(req: NextRequest) {
       req.cookies.get(LEGACY_SESSION_COOKIE_NAME)?.value;
 
     if (revokeAllOthers) {
-      const allSessions = getUserSessions(user.id);
+      const allSessions = await getUserSessions(user.id);
       let revoked = 0;
       for (const s of allSessions) {
         if (s.token !== currentToken) {
-          deleteSession(s.token);
+          await deleteSession(s.token);
           revoked++;
         }
       }
@@ -76,7 +76,7 @@ export async function DELETE(req: NextRequest) {
     }
 
     // Revoke all sessions including current
-    revokeAllUserSessions(user.id);
+    await revokeAllUserSessions(user.id);
 
     const response = NextResponse.json(
       { message: "All sessions terminated successfully." },

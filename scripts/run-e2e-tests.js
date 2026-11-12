@@ -2,30 +2,19 @@
 /**
  * KURONEX GAMES — Production Quality Engineering: End-to-End Journey Test Suite
  *
- * Simulates complete user journeys through the platform:
+ * Simulates complete user journeys through the platform against SQLite/Prisma:
  * ── JOURNEY 1: Authentic Player Lifecycle ──
- * 1. Browse catalogue and developer partners
- * 2. Register fresh player account
- * 3. Verify session authentication & profile
- * 4. Add game to personal library
- * 5. Verify library persistence
- * 6. Initiate and record desktop client download
- * 7. Logout and verify immediate session revocation
- *
  * ── JOURNEY 2: Administrator Governance & Telemetry ──
- * 1. Administrator authentication & credential verification
- * 2. Query real-time observability telemetry
- * 3. Inspect user directory & promote player role
- * 4. Verify game management catalogue access
- * 5. Publish official platform announcement
- * 6. Verify immutable audit log stream
- *
  * ── GUARANTEED CLEANUP ──
- * Purges all test users, sessions, announcements, and temporary artifacts.
  */
 
-const fs = require("fs");
-const path = require("path");
+const {
+  getPrisma,
+  extractSessionCookie,
+  createTempAdmin,
+  cleanupTestRecords,
+  disconnectPrisma,
+} = require("./test-helpers");
 
 const BASE_URL = process.env.TEST_BASE_URL || "http://localhost:3000";
 
@@ -42,12 +31,6 @@ function assert(condition, message) {
   }
 }
 
-function extractSessionCookie(res) {
-  const list = res.headers.getSetCookie ? res.headers.getSetCookie() : [res.headers.get("set-cookie") || ""];
-  const found = list.find((c) => c.startsWith("kuronex_session="));
-  return found ? found.split(";")[0] : "";
-}
-
 async function runE2ETests() {
   console.log("================================================================================");
   console.log("          KURONEX GAMES — END-TO-END USER JOURNEY VERIFICATION SUITE           ");
@@ -59,9 +42,10 @@ async function runE2ETests() {
   const playerPassword = "E2EPlayerPass#2026!";
 
   let playerCookie = "";
-  let adminCookie = "";
+  let tempAdmin = null;
   let createdPlayerId = "";
   let createdAnnouncementId = "";
+  let createdDlEventId = "";
 
   try {
     // ══════════════════════════════════════════════════════════════════════════
@@ -69,7 +53,6 @@ async function runE2ETests() {
     // ══════════════════════════════════════════════════════════════════════════
     console.log("═══ JOURNEY 1: Authentic Player Lifecycle ═══");
 
-    // 1. Browse Public Catalogue
     console.log("Step 1: Browsing public games and developer directory...");
     const browseRes = await fetch(`${BASE_URL}/api/library-games`);
     assert(browseRes.status === 200, "Catalogue loaded successfully (Status: 200)");
@@ -79,7 +62,6 @@ async function runE2ETests() {
     const devBrowseRes = await fetch(`${BASE_URL}/api/developers`);
     assert(devBrowseRes.status === 200, "Developer directory loaded successfully (Status: 200)");
 
-    // 2. Register New Player Account
     console.log("\nStep 2: Registering new player account...");
     const regRes = await fetch(`${BASE_URL}/api/auth/register`, {
       method: "POST",
@@ -97,7 +79,6 @@ async function runE2ETests() {
     createdPlayerId = regData.user?.id;
     assert(Boolean(createdPlayerId), `Player user ID assigned: ${createdPlayerId}`);
 
-    // 3. Verify Session Profile
     console.log("\nStep 3: Validating session authentication and initial state...");
     const meRes = await fetch(`${BASE_URL}/api/auth/me`, {
       headers: { Cookie: playerCookie },
@@ -107,7 +88,6 @@ async function runE2ETests() {
     assert(meData.user?.username === playerUsername, `Verified username matches registration (${meData.user?.username})`);
     assert(Array.isArray(meData.user?.library) && meData.user.library.length === 0, "Initial player library is empty array");
 
-    // 4. Add Game to Player Library
     console.log("\nStep 4: Adding title 'cyber-recon-2088' to personal library...");
     const addGameRes = await fetch(`${BASE_URL}/api/user/library`, {
       method: "POST",
@@ -121,7 +101,6 @@ async function runE2ETests() {
     const addGameData = await addGameRes.json();
     assert(addGameData.library?.includes("cyber-recon-2088"), "Response confirms 'cyber-recon-2088' in library");
 
-    // 5. Inspect Personal Library
     console.log("\nStep 5: Verifying persistent user library contains cartridge...");
     const libRes = await fetch(`${BASE_URL}/api/user/library`, {
       headers: { Cookie: playerCookie },
@@ -130,7 +109,6 @@ async function runE2ETests() {
     const libData = await libRes.json();
     assert(libData.library?.includes("cyber-recon-2088"), "Library persistence confirmed across requests");
 
-    // 6. Initiate & Record Client Download
     console.log("\nStep 6: Initiating and recording desktop client download event...");
     const dlRes = await fetch(`${BASE_URL}/api/downloads`, {
       method: "POST",
@@ -141,8 +119,9 @@ async function runE2ETests() {
       body: JSON.stringify({ itemType: "client", platform: "windows" }),
     });
     assert(dlRes.status === 201, `Download recorded successfully (Status: ${dlRes.status})`);
+    const dlData = await dlRes.json();
+    createdDlEventId = dlData.event?.id || "";
 
-    // 7. Logout Player & Revoke Session
     console.log("\nStep 7: Logging out and asserting session invalidation...");
     const logoutRes = await fetch(`${BASE_URL}/api/auth/logout`, {
       method: "POST",
@@ -161,34 +140,22 @@ async function runE2ETests() {
     // ══════════════════════════════════════════════════════════════════════════
     console.log("\n═══ JOURNEY 2: Administrator Governance & Telemetry ═══");
 
-    // 1. Admin Authentication
-    console.log("Step 1: Authenticating platform administrator...");
-    const adminLoginRes = await fetch(`${BASE_URL}/api/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        identifier: "dev.admin@kuronex.internal",
-        password: "KuronexSecureDev2026#Alpha",
-      }),
-    });
-    assert(adminLoginRes.status === 200, `Admin authenticated successfully (Status: ${adminLoginRes.status})`);
-    adminCookie = extractSessionCookie(adminLoginRes);
-    assert(Boolean(adminCookie), "Admin session established with secure cookie");
+    console.log("Step 1: Provisioning & authenticating test platform administrator...");
+    tempAdmin = await createTempAdmin(BASE_URL, "e2e_admin");
+    assert(Boolean(tempAdmin.cookie), "Admin session established with secure cookie");
 
-    // 2. Query Observability Telemetry
     console.log("\nStep 2: Querying platform observability telemetry...");
     const obsRes = await fetch(`${BASE_URL}/api/admin/observability`, {
-      headers: { Cookie: adminCookie },
+      headers: { Cookie: tempAdmin.cookie },
     });
     assert(obsRes.status === 200, `Observability snapshot retrieved (Status: ${obsRes.status})`);
     const obsData = await obsRes.json();
     assert(obsData.api?.totalRequests > 0, `Live API requests recorded (${obsData.api?.totalRequests} total requests)`);
     assert(obsData.subsystems?.length >= 4, `Subsystems monitored: ${obsData.subsystems?.map((s) => s.name).join(", ")}`);
 
-    // 3. User Directory & Role Promotion
     console.log("\nStep 3: Querying user directory and promoting player role...");
     const usersRes = await fetch(`${BASE_URL}/api/admin/users`, {
-      headers: { Cookie: adminCookie },
+      headers: { Cookie: tempAdmin.cookie },
     });
     assert(usersRes.status === 200, `User directory queried (Status: ${usersRes.status})`);
     const usersData = await usersRes.json();
@@ -199,7 +166,7 @@ async function runE2ETests() {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Cookie: adminCookie,
+        Cookie: tempAdmin.cookie,
       },
       body: JSON.stringify({
         action: "updateRole",
@@ -209,30 +176,27 @@ async function runE2ETests() {
     });
     assert(promoteRes.status === 200, `Promoted player to 'moderator' (Status: ${promoteRes.status})`);
 
-    // Verify Promoted Role in Users Directory
     const verifyUserRes = await fetch(`${BASE_URL}/api/admin/users`, {
-      headers: { Cookie: adminCookie },
+      headers: { Cookie: tempAdmin.cookie },
     });
     const verifyUserData = await verifyUserRes.json();
     const updatedPlayer = verifyUserData.users?.find((u) => u.id === createdPlayerId);
     assert(updatedPlayer?.role === "moderator", `Target user role is verified as 'moderator' (${updatedPlayer?.role})`);
 
-    // 4. Admin Game Catalogue Management
     console.log("\nStep 4: Querying administrator game catalogue...");
     const adminGamesRes = await fetch(`${BASE_URL}/api/admin/games`, {
-      headers: { Cookie: adminCookie },
+      headers: { Cookie: tempAdmin.cookie },
     });
     assert(adminGamesRes.status === 200, `Admin games catalogue loaded (Status: ${adminGamesRes.status})`);
     const adminGamesData = await adminGamesRes.json();
     assert(Array.isArray(adminGamesData.games) && adminGamesData.games.length > 0, `Games retrieved for admin management (${adminGamesData.games.length} titles)`);
 
-    // 5. Publish Official Announcement
     console.log("\nStep 5: Publishing platform announcement...");
     const annRes = await fetch(`${BASE_URL}/api/admin/system`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Cookie: adminCookie,
+        Cookie: tempAdmin.cookie,
       },
       body: JSON.stringify({
         action: "createAnnouncement",
@@ -246,53 +210,45 @@ async function runE2ETests() {
     });
     assert(annRes.status === 201, `Announcement published (Status: ${annRes.status})`);
     const annData = await annRes.json();
-    const createdAnn = annData.announcements?.[0];
+    const createdAnn = annData.announcements?.find((a) => a.title === `E2E System Notice ${timestamp}`);
     createdAnnouncementId = createdAnn?.id;
     assert(Boolean(createdAnnouncementId), `Announcement assigned ID: ${createdAnnouncementId}`);
 
-    // 6. Verify Immutable Audit Log Stream
     console.log("\nStep 6: Verifying administrative audit log recorded action...");
     const sysRes = await fetch(`${BASE_URL}/api/admin/system`, {
-      headers: { Cookie: adminCookie },
+      headers: { Cookie: tempAdmin.cookie },
     });
     assert(sysRes.status === 200, `System administration state retrieved (Status: ${sysRes.status})`);
     const sysData = await sysRes.json();
     assert(Array.isArray(sysData.logs), "Audit log stream is array of genuine platform records");
-    const latestAudit = sysData.logs?.find((l) => l.action?.toLowerCase().includes("announcement") || l.action?.toLowerCase().includes("role"));
+    const latestAudit = sysData.logs?.find((l) => l.actor === tempAdmin.username && (l.action?.toLowerCase().includes("announcement") || l.action?.toLowerCase().includes("role")));
     assert(Boolean(latestAudit), `Audit log contains verified administrative mutation (Action: ${latestAudit?.action})`);
-    assert(latestAudit?.actor === "admin" || latestAudit?.actor === "kuronex_dev", `Audit log verifies immutable actor identity (Actor: ${latestAudit?.actor})`);
-
+    assert(latestAudit?.actor === tempAdmin.username, `Audit log verifies immutable actor identity (Actor: ${latestAudit?.actor})`);
   } finally {
-    // ══════════════════════════════════════════════════════════════════════════
-    // GUARANTEED TEST DATA CLEANUP
-    // ══════════════════════════════════════════════════════════════════════════
     console.log("\n═══ GUARANTEED TEST DATA CLEANUP ═══");
     try {
-      const usersFile = path.join(process.cwd(), "src", "data", "users.json");
-      const sessionsFile = path.join(process.cwd(), "src", "data", "sessions.json");
-      const annFile = path.join(process.cwd(), "src", "data", "announcements.json");
-
-      if (fs.existsSync(usersFile)) {
-        const users = JSON.parse(fs.readFileSync(usersFile, "utf-8"));
-        const filteredUsers = users.filter((u) => u.username !== playerUsername);
-        fs.writeFileSync(usersFile, JSON.stringify(filteredUsers, null, 2), "utf-8");
-      }
-
-      if (fs.existsSync(sessionsFile) && createdPlayerId) {
-        const sessions = JSON.parse(fs.readFileSync(sessionsFile, "utf-8"));
-        const filteredSessions = sessions.filter((s) => s.userId !== createdPlayerId);
-        fs.writeFileSync(sessionsFile, JSON.stringify(filteredSessions, null, 2), "utf-8");
-      }
-
-      if (fs.existsSync(annFile) && createdAnnouncementId) {
-        const ann = JSON.parse(fs.readFileSync(annFile, "utf-8"));
-        const filteredAnn = ann.filter((a) => a.id !== createdAnnouncementId);
-        fs.writeFileSync(annFile, JSON.stringify(filteredAnn, null, 2), "utf-8");
-      }
-
-      console.log("  [CLEANUP] Test player, sessions, and announcement purged cleanly from persistent stores.");
+      const prisma = getPrisma();
+      await cleanupTestRecords({
+        usernames: [playerUsername, tempAdmin?.username],
+        userIds: [createdPlayerId, tempAdmin?.user?.id],
+        emails: [playerEmail, tempAdmin?.email],
+        announcementIds: [createdAnnouncementId],
+        downloadEventIds: [createdDlEventId],
+      });
+      await prisma.auditLog.deleteMany({
+        where: {
+          OR: [
+            { target: playerUsername },
+            { actorUsername: tempAdmin?.username || "__none__" },
+            { target: `E2E System Notice ${timestamp}` },
+          ],
+        },
+      });
+      console.log("  [CLEANUP] Test player, admin, sessions, and announcement purged cleanly.");
     } catch (err) {
       console.warn("  [CLEANUP WARNING] Failed cleaning up test artifacts:", err.message);
+    } finally {
+      await disconnectPrisma();
     }
   }
 

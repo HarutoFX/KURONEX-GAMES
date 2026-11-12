@@ -4,7 +4,7 @@
 >
 > 🚀 **Live Branch Preview (`arish-code`):** [https://kuronex-games-git-arish-code-harutofx.vercel.app](https://kuronex-games-git-arish-code-harutofx.vercel.app)
 >
-> 🛡️ **In-Website Admin Manager:** [`/admin`](https://kuronex-games-git-arish-code-harutofx.vercel.app/admin) (Passkey: `kuronex-admin-2026`)
+> 🛡️ **In-Website Admin Manager:** [`/admin`](https://kuronex-games-git-arish-code-harutofx.vercel.app/admin) (Passkey configured via `ADMIN_SETUP_PASSKEY`)
 
 KURONEX GAMES is a next-generation gaming platform built around your personal game library. Discover games based on your taste, mood, and the way you play.
 

@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
     const platform = searchParams.get("platform");
     const itemType = searchParams.get("itemType");
 
-    let allEvents = getDownloadEvents();
+    let allEvents = await getDownloadEvents();
     if (platform && ["windows", "macos", "linux", "other"].includes(platform)) {
       allEvents = allEvents.filter((e) => e.platform === platform);
     }
@@ -31,9 +31,11 @@ export async function GET(req: NextRequest) {
     const startIndex = (page - 1) * limit;
     const pagedEvents = allEvents.slice(startIndex, startIndex + limit);
 
-    const total = getTotalDownloadCount();
-    const platformStats = getPlatformDownloadStats();
-    const gameStats = getGameDownloadStats();
+    const [total, platformStats, gameStats] = await Promise.all([
+      getTotalDownloadCount(),
+      getPlatformDownloadStats(),
+      getGameDownloadStats(),
+    ]);
 
     return NextResponse.json(
       {
@@ -87,7 +89,7 @@ export async function POST(req: NextRequest) {
     const validVersion =
       typeof version === "string" ? version.trim().replace(/[^a-zA-Z0-9._-]/g, "").slice(0, 32) : undefined;
 
-    const event = recordDownloadEvent({
+    const event = await recordDownloadEvent({
       itemType: validItemType,
       itemId: validItemId,
       platform: validPlatform,
@@ -96,10 +98,11 @@ export async function POST(req: NextRequest) {
     });
 
     // Track genuine download completion event
-    trackEvent({
+    await trackEvent({
       eventType: "download.completed",
       category: "downloads",
       userId: user?.id,
+      clientIp,
       resourceId: validItemId,
       metadata: {
         itemType: validItemType,

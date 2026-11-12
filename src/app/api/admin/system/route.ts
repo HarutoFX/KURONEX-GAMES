@@ -43,17 +43,31 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
-    const logs = getAuditLogs();
-    const announcements = getAnnouncements();
-    const settings = getPlatformSettings();
-    const users = getAllUsers();
-    const librarySlots = getLibraryGames();
-    const developers = getDevelopers();
-
-    const totalDownloads = getTotalDownloadCount();
-    const platformDownloads = getPlatformDownloadStats();
-    const gameLibraryStats = getGameLibraryStats();
-    const activeSessions = getActiveSessionCount();
+    const [
+      logs,
+      announcements,
+      settings,
+      users,
+      librarySlots,
+      developers,
+      totalDownloads,
+      platformDownloads,
+      gameLibraryStats,
+      activeSessions,
+      analytics,
+    ] = await Promise.all([
+      getAuditLogs(),
+      getAnnouncements(),
+      getPlatformSettings(),
+      getAllUsers(),
+      getLibraryGames(),
+      getDevelopers(),
+      getTotalDownloadCount(),
+      getPlatformDownloadStats(),
+      getGameLibraryStats(),
+      getActiveSessionCount(),
+      calculateAnalyticsSummary("7D"),
+    ]);
 
     const metrics = {
       totalUsers: users.length,
@@ -73,7 +87,7 @@ export async function GET(req: NextRequest) {
         announcements,
         settings,
         metrics,
-        analytics: calculateAnalyticsSummary("7D"),
+        analytics,
       },
       { status: 200 }
     );
@@ -112,7 +126,7 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      const updated = savePlatformSettings(sanitized, auth.user.username);
+      const updated = await savePlatformSettings(sanitized, auth.user.username);
       return NextResponse.json({ message: "Settings updated successfully", settings: updated }, { status: 200 });
     }
 
@@ -141,7 +155,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Enforce author identity from authenticated session to prevent spoofing
-      createAnnouncement(
+      await createAnnouncement(
         {
           title,
           message,
@@ -154,7 +168,7 @@ export async function POST(req: NextRequest) {
       );
 
       return NextResponse.json(
-        { message: "Announcement broadcasted successfully", announcements: getAnnouncements() },
+        { message: "Announcement broadcasted successfully", announcements: await getAnnouncements() },
         { status: 201 }
       );
     }
@@ -168,12 +182,12 @@ export async function POST(req: NextRequest) {
       if (!body.id || typeof body.id !== "string") {
         return NextResponse.json({ error: "Announcement ID required" }, { status: 400 });
       }
-      const ok = toggleAnnouncement(body.id, auth.user.username);
+      const ok = await toggleAnnouncement(body.id, auth.user.username);
       if (!ok) {
         return NextResponse.json({ error: "Announcement not found" }, { status: 404 });
       }
       return NextResponse.json(
-        { message: "Announcement status updated", announcements: getAnnouncements() },
+        { message: "Announcement status updated", announcements: await getAnnouncements() },
         { status: 200 }
       );
     }
@@ -187,12 +201,12 @@ export async function POST(req: NextRequest) {
       if (!body.id || typeof body.id !== "string") {
         return NextResponse.json({ error: "Announcement ID required" }, { status: 400 });
       }
-      const ok = deleteAnnouncement(body.id, auth.user.username);
+      const ok = await deleteAnnouncement(body.id, auth.user.username);
       if (!ok) {
         return NextResponse.json({ error: "Announcement not found" }, { status: 404 });
       }
       return NextResponse.json(
-        { message: "Announcement removed", announcements: getAnnouncements() },
+        { message: "Announcement removed", announcements: await getAnnouncements() },
         { status: 200 }
       );
     }
@@ -203,7 +217,7 @@ export async function POST(req: NextRequest) {
       const target = typeof body.target === "string" ? body.target.trim() : "Console";
       const details = typeof body.details === "string" ? body.details.trim() : "";
 
-      const log = logAdminAction(actionName, category, target, details, auth.user.username);
+      const log = await logAdminAction(actionName, category, target, details, auth.user.username);
       return NextResponse.json({ message: "Action logged", log }, { status: 201 });
     }
 

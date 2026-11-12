@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { KeyRound, Database } from "lucide-react";
-import { PlatformSettings } from "@/lib/admin-store";
+import type { PlatformSettings } from "@/lib/admin-store";
 
 interface SettingsTabProps {
   settings: PlatformSettings;

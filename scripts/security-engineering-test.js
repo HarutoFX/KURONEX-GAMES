@@ -3,17 +3,25 @@
  * KURONEX GAMES — Comprehensive Security Engineering Verification Suite
  *
  * Verifies:
- * 1. Authentication hardening (registration, scrypt timing neutralization, brute-force lockout, suspended user block)
- * 2. Session security (HttpOnly, SameSite, rotation, session listing with masked tokens, revocation)
- * 3. Password recovery lifecycle (hashed token storage, single-use, session invalidation on reset)
- * 4. Server-side RBAC & permission boundaries (Analyst, Moderator, Admin hierarchy, root SuperAdmin protection)
- * 5. CSRF origin verification on mutating requests
- * 6. IDOR protection & data leakage audit (no hashes/salts in responses)
- * 7. Security response headers (HSTS, nosniff, frame-options)
+ * 1. HTTP security headers
+ * 2. CSRF origin validation on mutating requests
+ * 3. Authentication & input validation
+ * 4. Brute-force & side-channel timing defense
+ * 5. Session rotation & concurrent session telemetry
+ * 6. Password recovery lifecycle (Prisma hashed token storage & single-use)
+ * 7. Server-side RBAC & privilege escalation guards
+ * 8. Account suspension lifecycle & immediate eviction
  */
 
-const fs = require("fs");
-const path = require("path");
+const crypto = require("crypto");
+const {
+  getPrisma,
+  extractSessionCookie,
+  createTempAdmin,
+  cleanupTestRecords,
+  disconnectPrisma,
+} = require("./test-helpers");
+
 const BASE_URL = process.env.TEST_BASE_URL || "http://localhost:3000";
 
 let passed = 0;
@@ -29,24 +37,25 @@ function assert(condition, message) {
   }
 }
 
-function extractSessionCookie(res) {
-  const setCookie = res.headers.get("set-cookie");
-  if (!setCookie) return "";
-  const match = setCookie.match(/kuronex_session=([^;]+)/);
-  return match ? `kuronex_session=${match[1]}` : "";
-}
-
 async function runSecurityEngineeringTests() {
   console.log("================================================================================");
   console.log("      KURONEX GAMES — SECURITY ENGINEERING & AUTHENTICATION HARDENING SUITE      ");
   console.log("================================================================================\n");
+
+  const testUsername = `sec_user_${Date.now()}`;
+  const testEmail = `${testUsername}@kuronex.internal`;
+  const testPassword = "StrongSecurityPassword#2026!";
+
+  let createdUserId = "";
+  let tempAdmin = null;
+  let dlEventId = "";
 
   try {
     // ── 1. INFRASTRUCTURE & SECURITY HEADERS ──
     console.log("--- 1. Infrastructure & HTTP Security Headers ---");
     const headerRes = await fetch(`${BASE_URL}/api/developers`);
     assert(headerRes.status === 200, `GET /api/developers responded (Status: ${headerRes.status})`);
-    
+
     const xContentType = headerRes.headers.get("x-content-type-options");
     const xFrameOptions = headerRes.headers.get("x-frame-options");
     const referrerPolicy = headerRes.headers.get("referrer-policy");
@@ -72,11 +81,6 @@ async function runSecurityEngineeringTests() {
 
     // ── 3. AUTHENTICATION & INPUT VALIDATION ──
     console.log("\n--- 3. Authentication & Input Validation ---");
-    const testUsername = `sec_user_${Date.now()}`;
-    const testEmail = `${testUsername}@kuronex.internal`;
-    const testPassword = "StrongSecurityPassword#2026!";
-
-    // Short password rejection
     const shortPassRes = await fetch(`${BASE_URL}/api/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -84,7 +88,6 @@ async function runSecurityEngineeringTests() {
     });
     assert(shortPassRes.status === 400, `Registration with weak password rejected (Status: ${shortPassRes.status})`);
 
-    // Malformed email rejection
     const badEmailRes = await fetch(`${BASE_URL}/api/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -92,7 +95,6 @@ async function runSecurityEngineeringTests() {
     });
     assert(badEmailRes.status === 400, `Registration with malformed email rejected (Status: ${badEmailRes.status})`);
 
-    // Valid registration
     const regRes = await fetch(`${BASE_URL}/api/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -100,9 +102,10 @@ async function runSecurityEngineeringTests() {
     });
     assert(regRes.status === 201, `Valid registration succeeded (Status: ${regRes.status})`);
     const regCookie = extractSessionCookie(regRes);
+    const regData = await regRes.json();
+    createdUserId = regData.user?.id || "";
     assert(Boolean(regCookie), "Registration issues valid HttpOnly session cookie");
 
-    // Duplicate email rejection
     const dupRes = await fetch(`${BASE_URL}/api/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -134,7 +137,6 @@ async function runSecurityEngineeringTests() {
     assert(Boolean(loginCookie), "Login returns secure session cookie");
     assert(loginCookie !== regCookie, "Session token rotated upon authentication (anti-session-fixation)");
 
-    // Active session inspection
     const sessionsRes = await fetch(`${BASE_URL}/api/auth/sessions`, {
       headers: { Cookie: loginCookie },
     });
@@ -156,22 +158,22 @@ async function runSecurityEngineeringTests() {
     const forgotData = await forgotRes.json();
 
     let resetToken = forgotData.debugResetToken;
+    const prisma = getPrisma();
+    const userRow = await prisma.user.findUnique({ where: { email: testEmail.toLowerCase() } });
+    assert(Boolean(userRow && userRow.passwordResetTokenHash), "Password reset issued single-use cryptographic token in database");
+
     if (!resetToken) {
-      const usersPath = path.join(process.cwd(), "src", "data", "users.json");
-      const users = JSON.parse(fs.readFileSync(usersPath, "utf-8"));
-      const u = users.find((x) => x.email === testEmail);
-      assert(Boolean(u && u.passwordResetTokenHash), "Password reset issued single-use cryptographic token");
-      const crypto = require("crypto");
       resetToken = "tok_test_" + crypto.randomBytes(32).toString("hex");
       const tokenHash = crypto.createHash("sha256").update(resetToken).digest("hex");
-      u.passwordResetTokenHash = tokenHash;
-      u.passwordResetExpiresAt = Date.now() + 3600000;
-      fs.writeFileSync(usersPath, JSON.stringify(users, null, 2), "utf-8");
-    } else {
-      assert(Boolean(forgotData.debugResetToken), "Password reset issued single-use cryptographic token");
+      await prisma.user.update({
+        where: { id: userRow.id },
+        data: {
+          passwordResetTokenHash: tokenHash,
+          passwordResetExpiresAt: new Date(Date.now() + 3600000),
+        },
+      });
     }
 
-    // Invalid token rejection
     const invalidResetRes = await fetch(`${BASE_URL}/api/auth/reset-password`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -179,7 +181,6 @@ async function runSecurityEngineeringTests() {
     });
     assert(invalidResetRes.status === 400, `Invalid reset token rejected (Status: ${invalidResetRes.status})`);
 
-    // Valid reset
     const validResetRes = await fetch(`${BASE_URL}/api/auth/reset-password`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -187,7 +188,6 @@ async function runSecurityEngineeringTests() {
     });
     assert(validResetRes.status === 200, `Valid password reset succeeded (Status: ${validResetRes.status})`);
 
-    // Single-use token enforcement (token reuse must fail)
     const reuseResetRes = await fetch(`${BASE_URL}/api/auth/reset-password`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -195,7 +195,6 @@ async function runSecurityEngineeringTests() {
     });
     assert(reuseResetRes.status === 400, `Reusing already-consumed reset token blocked (Status: ${reuseResetRes.status})`);
 
-    // Verify previous session was invalidated upon password reset
     const oldSessionCheck = await fetch(`${BASE_URL}/api/auth/me`, {
       headers: { Cookie: loginCookie },
     });
@@ -204,35 +203,20 @@ async function runSecurityEngineeringTests() {
 
     // ── 7. SERVER-SIDE RBAC & PRIVILEGE ESCALATION GUARDS ──
     console.log("\n--- 7. Server-Side RBAC & Privilege Escalation Guards ---");
-    // Admin login
-    const adminLoginRes = await fetch(`${BASE_URL}/api/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        identifier: "dev.admin@kuronex.internal",
-        password: "KuronexSecureDev2026#Alpha",
-      }),
-    });
-    assert(adminLoginRes.status === 200, `Admin authenticated successfully (Status: ${adminLoginRes.status})`);
-    const adminCookie = extractSessionCookie(adminLoginRes);
+    tempAdmin = await createTempAdmin(BASE_URL, "sec_eng_admin");
+    assert(Boolean(tempAdmin.cookie), `Admin authenticated successfully (${tempAdmin.username})`);
 
-    // Promote test user to 'moderator'
     const promoteModRes = await fetch(`${BASE_URL}/api/admin/users`, {
       method: "POST",
-      headers: { Cookie: adminCookie, "Content-Type": "application/json" },
+      headers: { Cookie: tempAdmin.cookie, "Content-Type": "application/json" },
       body: JSON.stringify({
         action: "updateRole",
-        userId: regRes ? (await (await fetch(`${BASE_URL}/api/auth/login`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ identifier: testEmail, password: "NewSecretPassword#2026!" }),
-        })).json()).user.id : "unknown",
+        userId: createdUserId,
         role: "moderator",
       }),
     });
     assert(promoteModRes.status === 200, `Admin promoted test user to 'moderator' (Status: ${promoteModRes.status})`);
 
-    // Moderator login
     const modLoginRes = await fetch(`${BASE_URL}/api/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -242,7 +226,6 @@ async function runSecurityEngineeringTests() {
     const modCookie = extractSessionCookie(modLoginRes);
     assert(modUser.role.toLowerCase() === "moderator", `User role confirmed as 'moderator' (${modUser.role})`);
 
-    // Moderator attempting to update system platform settings (requires system:settings:write) -> Must fail with 403!
     const modSettingsAttempt = await fetch(`${BASE_URL}/api/admin/system`, {
       method: "POST",
       headers: { Cookie: modCookie, "Content-Type": "application/json" },
@@ -253,13 +236,12 @@ async function runSecurityEngineeringTests() {
     });
     assert(modSettingsAttempt.status === 403, `Moderator write to system settings blocked with 403 (Status: ${modSettingsAttempt.status})`);
 
-    // Moderator attempting to promote another user to 'admin' (privilege escalation) -> Must fail with 403!
     const modEscalateAttempt = await fetch(`${BASE_URL}/api/admin/users`, {
       method: "POST",
       headers: { Cookie: modCookie, "Content-Type": "application/json" },
       body: JSON.stringify({
         action: "updateRole",
-        userId: "vyo_2bc6070a18a0467a",
+        userId: "kuro_dev_admin_root",
         role: "admin",
       }),
     });
@@ -267,10 +249,9 @@ async function runSecurityEngineeringTests() {
 
     // ── 8. ACCOUNT SUSPENSION ENFORCEMENT ──
     console.log("\n--- 8. Account Suspension Lifecycle & Immediate Eviction ---");
-    // Admin suspends moderator account
     const suspendRes = await fetch(`${BASE_URL}/api/admin/users`, {
       method: "POST",
-      headers: { Cookie: adminCookie, "Content-Type": "application/json" },
+      headers: { Cookie: tempAdmin.cookie, "Content-Type": "application/json" },
       body: JSON.stringify({
         action: "suspendUser",
         userId: modUser.id,
@@ -280,14 +261,12 @@ async function runSecurityEngineeringTests() {
     });
     assert(suspendRes.status === 200, `Admin suspended test user account (Status: ${suspendRes.status})`);
 
-    // Suspended user's existing session must immediately fail
     const suspendedSessionCheck = await fetch(`${BASE_URL}/api/auth/me`, {
       headers: { Cookie: modCookie },
     });
     const suspendedMe = await suspendedSessionCheck.json();
     assert(!suspendedMe.user, "Suspended user active session immediately rejected on /api/auth/me");
 
-    // Suspended user login attempt must be rejected with 403
     const suspendedLoginAttempt = await fetch(`${BASE_URL}/api/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -295,25 +274,34 @@ async function runSecurityEngineeringTests() {
     });
     assert(suspendedLoginAttempt.status === 403, `Suspended user login rejected with 403 Forbidden (Status: ${suspendedLoginAttempt.status})`);
 
-    // Clean up: delete test user account
-    await fetch(`${BASE_URL}/api/admin/users`, {
-      method: "POST",
-      headers: { Cookie: adminCookie, "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "deleteUser", userId: modUser.id }),
-    });
-
-    // ── SUMMARY ──
     console.log("\n================================================================================");
     console.log(`TOTAL: ${passed + failed} | PASSED: ${passed} | FAILED: ${failed}`);
     console.log("================================================================================\n");
-
-    if (failed > 0) {
-      process.exit(1);
+  } finally {
+    try {
+      const prisma = getPrisma();
+      await cleanupTestRecords({
+        usernames: [testUsername, tempAdmin?.username],
+        userIds: [createdUserId, tempAdmin?.user?.id],
+        emails: [testEmail, tempAdmin?.email],
+        downloadEventIds: [dlEventId],
+      });
+      if (tempAdmin?.username) {
+        await prisma.auditLog.deleteMany({ where: { actorUsername: tempAdmin.username } });
+      }
+    } catch (err) {
+      console.warn("Cleanup error:", err.message);
+    } finally {
+      await disconnectPrisma();
     }
-  } catch (err) {
-    console.error("Security engineering test execution error:", err);
+  }
+
+  if (failed > 0) {
     process.exit(1);
   }
 }
 
-runSecurityEngineeringTests();
+runSecurityEngineeringTests().catch((err) => {
+  console.error("Security engineering test execution error:", err);
+  process.exit(1);
+});

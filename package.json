@@ -11,9 +11,15 @@
     "test": "node scripts/run-all-tests.js",
     "test:unit": "node scripts/run-unit-tests.js",
     "test:integration": "node scripts/run-integration-tests.js",
-    "test:e2e": "node scripts/run-e2e-tests.js"
+    "test:e2e": "node scripts/run-e2e-tests.js",
+    "db:generate": "prisma generate --schema=prisma/schema.sqlite.prisma",
+    "db:push": "prisma db push --schema=prisma/schema.sqlite.prisma",
+    "db:seed": "node prisma/seed.js",
+    "db:generate:pg": "prisma generate --schema=prisma/schema.prisma",
+    "db:migrate:pg": "prisma migrate deploy --schema=prisma/schema.prisma"
   },
   "dependencies": {
+    "@prisma/client": "^6.19.3",
     "@react-three/drei": "^10.7.9",
     "@react-three/fiber": "^9.8.1",
     "@tabler/icons-react": "^3.48.0",
@@ -34,6 +40,7 @@
     "@types/three": "^0.186.0",
     "eslint": "^9",
     "eslint-config-next": "16.3.8",
+    "prisma": "^6.19.3",
     "tailwindcss": "^4",
     "typescript": "^5"
   },

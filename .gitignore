@@ -58,3 +58,10 @@ CLAUDE.md
 GEMINI.md
 .gemini/
 
+# local SQLite database files
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+prisma/*.db*
+

@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
-    const developers = getDevelopers();
+    const developers = await getDevelopers();
     return NextResponse.json({ developers }, { status: 200 });
   } catch (error) {
     console.error("Admin developers GET error:", error);
@@ -35,8 +35,8 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Valid developer partner ID and name are required" }, { status: 400 });
       }
 
-      updateDeveloper(dev);
-      logAdminAction(
+      await updateDeveloper(dev);
+      await logAdminAction(
         "Updated Developer Partner",
         "CMS",
         dev.name,
@@ -48,8 +48,8 @@ export async function POST(req: NextRequest) {
     }
 
     if (Array.isArray(body.developers)) {
-      saveDevelopers(body.developers);
-      logAdminAction(
+      await saveDevelopers(body.developers);
+      await logAdminAction(
         "Batch Updated Developers",
         "CMS",
         "Partner Directory",

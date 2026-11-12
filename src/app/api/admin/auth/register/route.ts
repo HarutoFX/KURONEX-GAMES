@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
 
     // 1. Mandatory Master Security Passkey Verification
     if (!passkey || !validateAdminPasskey(passkey)) {
-      logAdminAction(
+      await logAdminAction(
         "ADMIN_REGISTER_DENIED",
         "AUTH",
         username || "unknown",
@@ -105,14 +105,14 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Uniqueness Checks
-    if (findUserByEmail(trimmedEmail)) {
+    if (await findUserByEmail(trimmedEmail)) {
       return NextResponse.json(
         { error: "An account with this email address already exists." },
         { status: 409 }
       );
     }
 
-    if (findUserByUsername(trimmedUsername)) {
+    if (await findUserByUsername(trimmedUsername)) {
       return NextResponse.json(
         { error: "An account with this Gamertag already exists." },
         { status: 409 }
@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
 
     // 4. Create Dedicated Administrator
     const assignedRole = role === "admin" ? "admin" : "super_admin";
-    const newAdmin = createAdminUser({
+    const newAdmin = await createAdminUser({
       username: trimmedUsername,
       email: trimmedEmail,
       password,
@@ -129,9 +129,9 @@ export async function POST(req: NextRequest) {
     });
 
     // 5. Establish Authenticated Session
-    const sessionToken = createSession(newAdmin.id, req);
+    const sessionToken = await createSession(newAdmin.id, req);
 
-    logAdminAction(
+    await logAdminAction(
       "ADMIN_PROVISIONED",
       "AUTH",
       newAdmin.id,
@@ -140,7 +140,7 @@ export async function POST(req: NextRequest) {
       "SUCCESS"
     );
 
-    const isSecure = process.env.NODE_ENV === "production";
+    const isSecure = process.env.NODE_ENV === "production" || process.env.SECURE_COOKIES === "true";
     const cookieOptions = {
       path: "/",
       httpOnly: true,
@@ -159,7 +159,7 @@ export async function POST(req: NextRequest) {
     );
 
     response.cookies.set(SESSION_COOKIE_NAME, sessionToken, cookieOptions);
-    response.cookies.set(LEGACY_SESSION_COOKIE_NAME, sessionToken, cookieOptions);
+    response.cookies.set(LEGACY_SESSION_COOKIE_NAME, "", { ...cookieOptions, maxAge: 0 });
 
     return response;
   } catch (error) {

@@ -11,10 +11,10 @@ import {
 } from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
-import { LibraryGameSlot, DeveloperPartner } from "@/lib/library-store";
+import type { LibraryGameSlot, DeveloperPartner } from "@/lib/library-store";
 import { GAMES_DATA } from "@/lib/games";
-import { AuditLog, Announcement, PlatformSettings } from "@/lib/admin-store";
-import { SafeUser } from "@/lib/auth";
+import type { AuditLog, Announcement, PlatformSettings } from "@/lib/admin-store";
+import type { SafeUser } from "@/lib/auth";
 
 import { AdminSidebar, AdminTab } from "@/components/admin/AdminSidebar";
 import { AdminHeader } from "@/components/admin/AdminHeader";

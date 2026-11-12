@@ -15,6 +15,10 @@ generator client {
 enum RoleName {
   PLAYER
   DEVELOPER
+  ANALYST
+  CONTENT_MANAGER
+  GAME_MANAGER
+  MODERATOR
   ADMIN
   SUPER_ADMIN
 }
@@ -84,26 +88,35 @@ enum AuditStatus {
 // ─── AUTHENTICATION & ACCESS CONTROL ────────────────────────────────────────
 
 model User {
-  id           String        @id @default(cuid())
-  username     String        @unique
-  email        String        @unique
-  passwordHash String
-  salt         String
-  roleId       String
-  role         Role          @relation(fields: [roleId], references: [id])
-  isActive     Boolean       @default(true)
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  id                     String        @id @default(cuid())
+  username               String        @unique
+  email                  String        @unique
+  passwordHash           String
+  salt                   String
+  role                   String        @default("player")
+  roleId                 String?
+  roleRef                Role?         @relation(fields: [roleId], references: [id])
+  isActive               Boolean       @default(true)
+  isSuspended            Boolean       @default(false)
+  suspendedReason        String?
+  isEmailVerified        Boolean       @default(false)
+  passwordResetTokenHash String?
+  passwordResetExpiresAt DateTime?
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
 
-  sessions       Session[]
-  library        UserLibrary[]
-  downloadEvents DownloadEvent[]
-  announcements  Announcement[]
-  reviews        Review[]
-  ratings        Rating[]
-  auditLogs      AuditLog[]
+  sessions             Session[]
+  library              UserLibrary[]
+  downloadEvents       DownloadEvent[]
+  announcements        Announcement[]
+  reviews              Review[]
+  ratings              Rating[]
+  auditLogs            AuditLog[]
+  developerSubmissions DeveloperSubmission[]
+  developerBuilds      DeveloperBuild[]
 
   @@index([roleId])
+  @@index([role])
   @@map("users")
 }
 
@@ -159,12 +172,12 @@ model Session {
 // ─── CATALOGUE & STUDIOS ────────────────────────────────────────────────────
 
 model GameCategory {
-  id           String             @id
-  slug         String             @unique
-  name         String             @unique
+  id           String            @id
+  slug         String            @unique
+  name         String            @unique
   description  String?
-  displayOrder Int                @default(0)
-  createdAt    DateTime           @default(now())
+  displayOrder Int               @default(0)
+  createdAt    DateTime          @default(now())
 
   games        Game[]
   librarySlots LibraryGameSlot[]
@@ -173,53 +186,60 @@ model GameCategory {
 }
 
 model DeveloperStudio {
-  id           String      @id
-  slug         String      @unique
-  name         String
-  tagline      String?
-  icon         String      @default("Sparkles")
-  genre        String
-  headquarters String
-  description  String
-  gamesCount   Int         @default(0)
-  partnerTier  PartnerTier @default(STUDIO_PARTNER)
-  website      String?
-  showInTicker Boolean     @default(true)
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  id            String      @id
+  slug          String      @unique
+  name          String
+  tagline       String?
+  icon          String      @default("Sparkles")
+  genre         String
+  headquarters  String
+  country       String?
+  logo          String?
+  teamSize      String?
+  primaryEngine String?
+  ownerUserId   String?
+  description   String
+  gamesCount    Int         @default(0)
+  partnerTier   PartnerTier @default(STUDIO_PARTNER)
+  website       String?
+  showInTicker  Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 
-  games        Game[]
+  games         Game[]
 
   @@index([partnerTier])
+  @@index([ownerUserId])
   @@map("developer_studios")
 }
 
 model Game {
-  id              String        @id
-  slug            String        @unique
-  projectCode     String        @unique
+  id              String           @id
+  slug            String           @unique
+  projectCode     String           @unique
   title           String
   tagline         String
   genre           String
   categoryId      String
-  category        GameCategory  @relation(fields: [categoryId], references: [id])
+  category        GameCategory     @relation(fields: [categoryId], references: [id])
   studioId        String?
   studio          DeveloperStudio? @relation(fields: [studioId], references: [id], onDelete: SetNull)
-  phase           String        @default("Concept")
-  statusBadge     String        @default("DEVELOPMENT")
-  accentColor     String        @default("#FF263D")
+  phase           String           @default("Concept")
+  statusBadge     String           @default("DEVELOPMENT")
+  accentColor     String           @default("#FF263D")
   description     String
-  progressPercent Int           @default(0)
+  progressPercent Int              @default(0)
   coverImage      String?
   storageSize     String?
   developerName   String?
-  price           String        @default("Free to Play")
-  isFeatured      Boolean       @default(false)
-  isCatalogue     Boolean       @default(true)
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  price           String           @default("Free to Play")
+  platforms       Json             @default("[]")
+  tags            Json             @default("[]")
+  isFeatured      Boolean          @default(false)
+  isCatalogue     Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
-  userLibraries   UserLibrary[]
   downloadBuilds  DownloadBuild[]
   downloadEvents  DownloadEvent[]
   reviews         Review[]
@@ -231,21 +251,22 @@ model Game {
 }
 
 model LibraryGameSlot {
-  id              String        @id
+  id              String       @id
   categoryId      String
-  category        GameCategory  @relation(fields: [categoryId], references: [id])
+  category        GameCategory @relation(fields: [categoryId], references: [id])
   slotNumber      Int
-  title           String        @default("")
-  tagline         String        @default("")
-  description     String        @default("")
-  coverImage      String        @default("")
-  badge           String        @default("SLOT OPEN")
-  accentColor     String        @default("#FF263D")
-  progressPercent Int           @default(0)
-  developer       String        @default("")
-  isEmpty         Boolean       @default(true)
+  title           String       @default("")
+  tagline         String       @default("")
+  description     String       @default("")
+  coverImage      String       @default("")
+  badge           String       @default("SLOT OPEN")
+  accentColor     String       @default("#FF263D")
+  progressPercent Int          @default(0)
+  developer       String       @default("")
+  tags            Json         @default("[]")
+  isEmpty         Boolean      @default(true)
   gameId          String?
-  updatedAt       DateTime      @updatedAt
+  updatedAt       DateTime     @updatedAt
 
   @@index([categoryId, slotNumber])
   @@map("library_game_slots")
@@ -258,7 +279,6 @@ model UserLibrary {
   userId          String
   user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   gameId          String
-  game            Game              @relation(fields: [gameId], references: [id], onDelete: Cascade)
   acquiredAt      DateTime          @default(now())
   playTimeMinutes Int               @default(0)
   lastPlayedAt    DateTime?
@@ -278,7 +298,7 @@ model Review {
   game            Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
   title           String
   content         String
-  ratingScore     Int      // 1 to 5
+  ratingScore     Int
   isVerifiedOwner Boolean  @default(false)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -294,7 +314,7 @@ model Rating {
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   gameId      String
   game        Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
-  ratingScore Int      // 1 to 5
+  ratingScore Int
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -303,7 +323,7 @@ model Rating {
   @@map("ratings")
 }
 
-// ─── DOWNLOAD BUILDS & TELEMETRY ────────────────────────────────────────────
+// ─── DOWNLOAD BUILDS, WAITLIST & TELEMETRY ──────────────────────────────────
 
 model DownloadBuild {
   id             String           @id @default(cuid())
@@ -342,6 +362,80 @@ model DownloadEvent {
   @@map("download_events")
 }
 
+model WaitlistEntry {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  platform    String   @default("windows")
+  queueNumber Int      @unique
+  vipToken    String   @unique
+  source      String   @default("download")
+  createdAt   DateTime @default(now())
+
+  @@index([platform])
+  @@map("waitlist_entries")
+}
+
+// ─── DEVELOPER PORTAL WORKFLOWS ─────────────────────────────────────────────
+
+model DeveloperPitch {
+  id           String   @id @default(cuid())
+  studioName   String
+  email        String
+  projectTitle String
+  message      String
+  status       String   @default("PENDING")
+  createdAt    DateTime @default(now())
+
+  @@index([status])
+  @@map("developer_pitches")
+}
+
+model DeveloperSubmission {
+  id               String   @id @default(cuid())
+  userId           String?
+  user             User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  studioName       String
+  contactEmail     String
+  title            String
+  category         String
+  targetEngine     String
+  targetOs         Json     @default("[]")
+  readinessPercent Int      @default(50)
+  coverImageUrl    String?
+  status           String   @default("In Review")
+  pitchSummary     String
+  clientBinaryName String?
+  clientVersionTag String?
+  clientChannel    String?
+  submittedAt      DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@map("developer_submissions")
+}
+
+model DeveloperBuild {
+  id             String   @id @default(cuid())
+  userId         String?
+  user           User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  submissionId   String?
+  gameTitle      String
+  versionTag     String
+  channel        String   @default("Beta")
+  targetOs       String
+  executableName String
+  buildSizeBytes BigInt
+  sha256Hash     String
+  releaseNotes   String
+  releasedAt     DateTime @default(now())
+  status         String   @default("Active")
+
+  @@index([userId])
+  @@index([status])
+  @@map("developer_builds")
+}
+
 // ─── PROMOTIONS & ANNOUNCEMENTS ─────────────────────────────────────────────
 
 model Promotion {
@@ -353,6 +447,9 @@ model Promotion {
   gameId      String?
   bannerUrl   String?
   targetUrl   String
+  code        String?
+  claimsCount Int       @default(0)
+  maxClaims   Int       @default(0)
   startsAt    DateTime  @default(now())
   endsAt      DateTime?
   isActive    Boolean   @default(true)
@@ -379,7 +476,7 @@ model Announcement {
   @@map("announcements")
 }
 
-// ─── AUDIT & SETTINGS ───────────────────────────────────────────────────────
+// ─── AUDIT, ANALYTICS & SETTINGS ────────────────────────────────────────────
 
 model AuditLog {
   id            String        @id @default(cuid())
@@ -402,10 +499,42 @@ model AuditLog {
 model PlatformSetting {
   key         String   @id
   value       String
-  valueType   String   @default("string") // string, boolean, number, json
+  valueType   String   @default("string")
   isPublic    Boolean  @default(false)
   description String?
   updatedAt   DateTime @updatedAt
 
   @@map("platform_settings")
+}
+
+model PlatformEvent {
+  id                 String   @id @default(cuid())
+  eventType          String
+  category           String
+  timestamp          DateTime @default(now())
+  userId             String?
+  anonymousSessionId String?
+  resourceId         String?
+  metadata           Json?
+
+  @@index([timestamp])
+  @@index([eventType])
+  @@index([category])
+  @@map("platform_events")
+}
+
+model OperationalAlert {
+  id             String    @id
+  code           String
+  title          String
+  message        String
+  severity       String
+  triggerTime    DateTime  @default(now())
+  resolvedTime   DateTime?
+  isActive       Boolean   @default(true)
+  deliveryStatus String    @default("WEBHOOK_NOT_CONFIGURED")
+
+  @@index([triggerTime])
+  @@index([isActive])
+  @@map("operational_alerts")
 }

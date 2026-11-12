@@ -11,7 +11,7 @@ import {
   AlertCircle,
   Save,
 } from "lucide-react";
-import { SafeUser } from "@/lib/auth";
+import type { SafeUser } from "@/lib/auth";
 
 interface AdminProfileModalProps {
   isOpen: boolean;

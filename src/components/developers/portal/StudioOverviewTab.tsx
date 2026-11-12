@@ -6,7 +6,6 @@ import {
   HardDriveDownload,
   Users,
   ShieldCheck,
-  TrendingUp,
   Cpu,
   Plus,
 } from "lucide-react";
@@ -15,6 +14,7 @@ import { DeveloperSubmissionDto, ClientBuildDto } from "@/services/types";
 interface StudioOverviewTabProps {
   submissions: DeveloperSubmissionDto[];
   builds: ClientBuildDto[];
+  vaultAdds?: number;
   onNewSubmission: () => void;
   onNewBuild: () => void;
 }
@@ -22,6 +22,7 @@ interface StudioOverviewTabProps {
 export function StudioOverviewTab({
   submissions,
   builds,
+  vaultAdds = 0,
   onNewSubmission,
   onNewBuild,
 }: StudioOverviewTabProps) {
@@ -102,13 +103,11 @@ export function StudioOverviewTab({
             <Users className="h-4 w-4 text-purple-400" />
           </div>
           <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-white">14,290</span>
-            <span className="text-xs text-emerald-400 flex items-center font-medium">
-              <TrendingUp className="h-3 w-3 mr-0.5" /> +24%
-            </span>
+            <span className="text-3xl font-extrabold text-white">{vaultAdds.toLocaleString()}</span>
+            <span className="text-xs text-emerald-400 font-medium">Synced with DB</span>
           </div>
           <p className="mt-2 text-[11px] text-[#929292]">
-            Players who wishlisted / reserved in web vault
+            Vault reservations across catalog titles
           </p>
         </div>
 

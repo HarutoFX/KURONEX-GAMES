@@ -1,44 +1,58 @@
-import path from "path";
 import crypto from "crypto";
-import { DbUser, DbSession } from "./types";
-import { safeReadJsonSync, atomicWriteJsonSync } from "./atomic-store";
+import prisma from "@/lib/prisma";
+import { DbUser, DbUserRole, DbSession } from "./types";
 
-const USERS_FILE = path.join(process.cwd(), "src", "data", "users.json");
-const SESSIONS_FILE = path.join(process.cwd(), "src", "data", "sessions.json");
-const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
-
-function readUsers(): DbUser[] {
-  return safeReadJsonSync<DbUser[]>(USERS_FILE, []);
-}
-
-function writeUsers(users: DbUser[]): void {
-  atomicWriteJsonSync(USERS_FILE, users);
-}
-
-function readSessions(): DbSession[] {
-  return safeReadJsonSync<DbSession[]>(SESSIONS_FILE, []);
-}
-
-function writeSessions(sessions: DbSession[]): void {
-  atomicWriteJsonSync(SESSIONS_FILE, sessions);
-}
+const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
 
 export const UsersRepository = {
   async findById(id: string): Promise<DbUser | null> {
-    const users = readUsers();
-    return users.find((u) => u.id === id) || null;
+    const user = await prisma.user.findUnique({ where: { id } });
+    if (!user) return null;
+    return {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      passwordHash: user.passwordHash,
+      salt: user.salt,
+      role: user.role as DbUserRole,
+      isActive: user.isActive,
+      createdAt: user.createdAt.toISOString(),
+      updatedAt: user.updatedAt.toISOString(),
+    };
   },
 
   async findByEmail(email: string): Promise<DbUser | null> {
-    const normalized = email.trim().toLowerCase();
-    const users = readUsers();
-    return users.find((u) => u.email.toLowerCase() === normalized) || null;
+    const user = await prisma.user.findUnique({ where: { email: email.trim().toLowerCase() } });
+    if (!user) return null;
+    return {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      passwordHash: user.passwordHash,
+      salt: user.salt,
+      role: user.role as DbUserRole,
+      isActive: user.isActive,
+      createdAt: user.createdAt.toISOString(),
+      updatedAt: user.updatedAt.toISOString(),
+    };
   },
 
   async findByUsername(username: string): Promise<DbUser | null> {
-    const normalized = username.trim().toLowerCase();
-    const users = readUsers();
-    return users.find((u) => u.username.toLowerCase() === normalized) || null;
+    const lower = username.trim().toLowerCase();
+    const candidates = await prisma.user.findMany({ where: { username: { contains: username.trim() } } });
+    const user = candidates.find((u) => u.username.toLowerCase() === lower);
+    if (!user) return null;
+    return {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      passwordHash: user.passwordHash,
+      salt: user.salt,
+      role: user.role as DbUserRole,
+      isActive: user.isActive,
+      createdAt: user.createdAt.toISOString(),
+      updatedAt: user.updatedAt.toISOString(),
+    };
   },
 
   async createUser(params: {
@@ -46,122 +60,133 @@ export const UsersRepository = {
     email: string;
     passwordHash: string;
     salt: string;
-    role?: "player" | "developer" | "admin";
+    role?: DbUserRole;
   }): Promise<DbUser> {
-    const users = readUsers();
-    const newUser: DbUser = {
-      id: `kuro_${crypto.randomBytes(8).toString("hex")}`,
-      username: params.username.trim(),
-      email: params.email.trim().toLowerCase(),
-      passwordHash: params.passwordHash,
-      salt: params.salt,
-      role: params.role || "player",
-      isActive: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+    const user = await prisma.user.create({
+      data: {
+        id: `kuro_${crypto.randomBytes(8).toString("hex")}`,
+        username: params.username.trim(),
+        email: params.email.trim().toLowerCase(),
+        passwordHash: params.passwordHash,
+        salt: params.salt,
+        role: params.role || "player",
+        isActive: true,
+      },
+    });
+    return {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      passwordHash: user.passwordHash,
+      salt: user.salt,
+      role: user.role as DbUserRole,
+      isActive: user.isActive,
+      createdAt: user.createdAt.toISOString(),
+      updatedAt: user.updatedAt.toISOString(),
     };
-
-    users.push(newUser);
-    writeUsers(users);
-    return newUser;
   },
 
-  async updateRole(
-    userId: string,
-    newRole: "player" | "developer" | "admin"
-  ): Promise<DbUser | null> {
-    const users = readUsers();
-    const index = users.findIndex((u) => u.id === userId);
-    if (index === -1) return null;
-
-    users[index] = {
-      ...users[index],
-      role: newRole,
-      updatedAt: new Date().toISOString(),
+  async updateRole(userId: string, newRole: DbUserRole): Promise<DbUser | null> {
+    const existing = await prisma.user.findUnique({ where: { id: userId } });
+    if (!existing) return null;
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: { role: newRole },
+    });
+    return {
+      id: updated.id,
+      username: updated.username,
+      email: updated.email,
+      passwordHash: updated.passwordHash,
+      salt: updated.salt,
+      role: updated.role as DbUserRole,
+      isActive: updated.isActive,
+      createdAt: updated.createdAt.toISOString(),
+      updatedAt: updated.updatedAt.toISOString(),
     };
-
-    writeUsers(users);
-    return users[index];
   },
 
   async deleteUser(userId: string): Promise<boolean> {
-    const users = readUsers();
-    const filtered = users.filter((u) => u.id !== userId);
-    if (filtered.length === users.length) return false;
-
-    writeUsers(filtered);
-
-    // Cascade delete user sessions
-    const sessions = readSessions().filter((s) => s.userId !== userId);
-    writeSessions(sessions);
-
-    return true;
+    try {
+      await prisma.user.delete({ where: { id: userId } });
+      return true;
+    } catch {
+      return false;
+    }
   },
 
   async getAllUsers(params?: {
     skip?: number;
     limit?: number;
   }): Promise<{ users: DbUser[]; total: number }> {
-    const users = readUsers();
-    const total = users.length;
-    const skip = params?.skip || 0;
-    const limit = params?.limit ? Math.min(params.limit, 100) : total;
+    const [total, rows] = await Promise.all([
+      prisma.user.count(),
+      prisma.user.findMany({
+        skip: params?.skip || 0,
+        take: params?.limit ? Math.min(params.limit, 100) : undefined,
+        orderBy: { createdAt: "desc" },
+      }),
+    ]);
 
     return {
-      users: users.slice(skip, skip + limit),
       total,
+      users: rows.map((u) => ({
+        id: u.id,
+        username: u.username,
+        email: u.email,
+        passwordHash: u.passwordHash,
+        salt: u.salt,
+        role: u.role as DbUserRole,
+        isActive: u.isActive,
+        createdAt: u.createdAt.toISOString(),
+        updatedAt: u.updatedAt.toISOString(),
+      })),
     };
   },
 
-  // ─── SESSIONS ─────────────────────────────────────────────────────────────
-  async createSession(
-    userId: string,
-    ipAddress?: string,
-    userAgent?: string
-  ): Promise<DbSession> {
-    const sessions = readSessions();
+  async createSession(userId: string, ipAddress?: string, userAgent?: string): Promise<DbSession> {
     const token = crypto.randomBytes(32).toString("hex");
-    const newSession: DbSession = {
-      id: `sess_${crypto.randomBytes(8).toString("hex")}`,
-      token,
-      userId,
-      ipAddress,
-      userAgent,
-      expiresAt: Date.now() + SESSION_DURATION_MS,
-      createdAt: new Date().toISOString(),
+    const session = await prisma.session.create({
+      data: {
+        token,
+        userId,
+        ipAddress: ipAddress || null,
+        userAgent: userAgent || null,
+        expiresAt: new Date(Date.now() + SESSION_DURATION_MS),
+      },
+    });
+    return {
+      id: session.id,
+      token: session.token,
+      userId: session.userId,
+      ipAddress: session.ipAddress ?? undefined,
+      userAgent: session.userAgent ?? undefined,
+      expiresAt: session.expiresAt.getTime(),
+      createdAt: session.createdAt.toISOString(),
     };
-
-    sessions.push(newSession);
-    writeSessions(sessions);
-    return newSession;
   },
 
   async findSession(token: string): Promise<DbSession | null> {
     if (!token) return null;
-    const sessions = readSessions();
-    const now = Date.now();
-    const session = sessions.find((s) => s.token === token);
-
-    if (!session || session.expiresAt <= now) {
-      return null;
-    }
-    return session;
+    const session = await prisma.session.findUnique({ where: { token } });
+    if (!session || session.expiresAt <= new Date()) return null;
+    return {
+      id: session.id,
+      token: session.token,
+      userId: session.userId,
+      ipAddress: session.ipAddress ?? undefined,
+      userAgent: session.userAgent ?? undefined,
+      expiresAt: session.expiresAt.getTime(),
+      createdAt: session.createdAt.toISOString(),
+    };
   },
 
   async deleteSession(token: string): Promise<boolean> {
-    const sessions = readSessions();
-    const filtered = sessions.filter((s) => s.token !== token);
-    if (filtered.length === sessions.length) return false;
-
-    writeSessions(filtered);
-    return true;
+    const result = await prisma.session.deleteMany({ where: { token } });
+    return result.count > 0;
   },
 
   async getActiveSessionCount(): Promise<number> {
-    const sessions = readSessions();
-    const now = Date.now();
-    const active = sessions.filter((s) => s.expiresAt > now);
-    return active.length;
+    return prisma.session.count({ where: { expiresAt: { gt: new Date() } } });
   },
 };
-

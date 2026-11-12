@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     }
 
     const trimmedEmail = email.trim().toLowerCase();
-    const user = findUserByEmail(trimmedEmail);
+    const user = await findUserByEmail(trimmedEmail);
 
     let debugToken: string | undefined;
 
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
       const tokenHash = hashToken(rawToken);
       const expiresAt = Date.now() + 60 * 60 * 1000; // 1 hour validity
 
-      setPasswordResetToken(user.id, tokenHash, expiresAt);
+      await setPasswordResetToken(user.id, tokenHash, expiresAt);
 
       if (process.env.NODE_ENV !== "production" || process.env.ENABLE_TEST_DEBUG_TOKEN === "true") {
         debugToken = rawToken;

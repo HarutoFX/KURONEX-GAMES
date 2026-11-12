@@ -4,7 +4,7 @@ import React, { useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Plus, Sparkles, Play, Edit3 } from "lucide-react";
-import { LibraryGameSlot } from "@/lib/library-store";
+import type { LibraryGameSlot } from "@/lib/library-store";
 
 interface LargeLibraryCardProps {
   slot: LibraryGameSlot;

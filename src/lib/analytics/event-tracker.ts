@@ -1,5 +1,3 @@
-import fs from "fs";
-import path from "path";
 import crypto from "crypto";
 import { EventEmitter } from "events";
 import {
@@ -9,17 +7,26 @@ import {
   EventCategory,
   MetricTrend,
 } from "./types";
-import { safeReadJsonSync, atomicWriteJsonSync } from "@/lib/db/atomic-store";
+import prisma from "@/lib/prisma";
 import { getDownloadEvents } from "@/lib/download-store";
 import { getLibraryGames } from "@/lib/library-store";
-
-const EVENTS_FILE = path.join(process.cwd(), "src", "data", "events.json");
-const USERS_FILE = path.join(process.cwd(), "src", "data", "users.json");
 
 // In-memory event bus for real-time Server-Sent Events (SSE) dispatch
 export const analyticsEventBus = new EventEmitter();
 // Allow multiple concurrent admin subscribers
 analyticsEventBus.setMaxListeners(50);
+
+function parseMetadata(
+  raw: string | null | undefined
+): Record<string, string | number | boolean | undefined> | undefined {
+  if (!raw) return undefined;
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 /**
  * Hashes an IP address using SHA-256 with a salt for privacy compliance
@@ -33,7 +40,7 @@ export function hashIpForPrivacy(ip: string): string {
 /**
  * Persists an authentic platform event and notifies real-time listeners.
  */
-export function trackEvent(params: {
+export async function trackEvent(params: {
   eventType: EventType;
   category: EventCategory;
   userId?: string;
@@ -41,11 +48,11 @@ export function trackEvent(params: {
   clientIp?: string;
   resourceId?: string;
   metadata?: Record<string, string | number | boolean | undefined>;
-}): PlatformEvent {
-  const events = safeReadJsonSync<PlatformEvent[]>(EVENTS_FILE, []);
-
+}): Promise<PlatformEvent> {
   // Ensure IP is never persisted raw - hash for pseudonymized unique actor aggregation
-  const actorId = params.anonymousSessionId || (params.clientIp ? `ip_${hashIpForPrivacy(params.clientIp)}` : undefined);
+  const actorId =
+    params.anonymousSessionId ||
+    (params.clientIp ? `ip_${hashIpForPrivacy(params.clientIp)}` : undefined);
 
   const newEvent: PlatformEvent = {
     id: `evt_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`,
@@ -58,11 +65,19 @@ export function trackEvent(params: {
     metadata: params.metadata,
   };
 
-  events.unshift(newEvent);
-
-  // Keep last 5,000 events to manage disk space while maintaining rich historical telemetry
   try {
-    atomicWriteJsonSync(EVENTS_FILE, events.slice(0, 5000));
+    await prisma.platformEvent.create({
+      data: {
+        id: newEvent.id,
+        eventType: newEvent.eventType,
+        category: newEvent.category,
+        timestamp: new Date(newEvent.timestamp),
+        userId: newEvent.userId || null,
+        anonymousSessionId: newEvent.anonymousSessionId || null,
+        resourceId: newEvent.resourceId || null,
+        metadata: newEvent.metadata ? JSON.stringify(newEvent.metadata) : null,
+      },
+    });
   } catch (error) {
     console.error("[ANALYTICS ERROR] Failed to persist event:", error);
   }
@@ -76,26 +91,37 @@ export function trackEvent(params: {
 /**
  * Retrieves platform events with optional filtering.
  */
-export function getEvents(filter?: {
+export async function getEvents(filter?: {
   category?: EventCategory;
   eventType?: EventType;
   sinceMs?: number;
   limit?: number;
-}): PlatformEvent[] {
-  const events = safeReadJsonSync<PlatformEvent[]>(EVENTS_FILE, []);
-  let filtered = events;
+}): Promise<PlatformEvent[]> {
+  try {
+    const rows = await prisma.platformEvent.findMany({
+      where: {
+        ...(filter?.category ? { category: filter.category } : {}),
+        ...(filter?.eventType ? { eventType: filter.eventType } : {}),
+        ...(filter?.sinceMs ? { timestamp: { gte: new Date(filter.sinceMs) } } : {}),
+      },
+      orderBy: { timestamp: "desc" },
+      take: filter?.limit || 100,
+    });
 
-  if (filter?.category) {
-    filtered = filtered.filter((e) => e.category === filter.category);
+    return rows.map((r) => ({
+      id: r.id,
+      eventType: r.eventType as EventType,
+      category: r.category as EventCategory,
+      timestamp: r.timestamp.toISOString(),
+      userId: r.userId ?? undefined,
+      anonymousSessionId: r.anonymousSessionId ?? undefined,
+      resourceId: r.resourceId ?? undefined,
+      metadata: parseMetadata(r.metadata),
+    }));
+  } catch (error) {
+    console.error("[ANALYTICS ERROR] Failed to query events:", error);
+    return [];
   }
-  if (filter?.eventType) {
-    filtered = filtered.filter((e) => e.eventType === filter.eventType);
-  }
-  if (filter?.sinceMs) {
-    filtered = filtered.filter((e) => new Date(e.timestamp).getTime() >= filter.sinceMs!);
-  }
-
-  return filtered.slice(0, filter?.limit || 100);
 }
 
 /**
@@ -129,21 +155,15 @@ function calculateTrend(current: number, previous: number): MetricTrend {
 /**
  * Calculates genuine platform analytics metrics strictly from persisted records.
  */
-export function calculateAnalyticsSummary(timeRange: "24H" | "7D" | "30D" | "ALL" = "7D"): AnalyticsSummary {
-  const events = safeReadJsonSync<PlatformEvent[]>(EVENTS_FILE, []);
-  const legacyDownloads = getDownloadEvents();
-  const librarySlots = getLibraryGames();
-
-  // Read registered users
-  let totalRegistered = 0;
-  try {
-    if (fs.existsSync(USERS_FILE)) {
-      const usersData = JSON.parse(fs.readFileSync(USERS_FILE, "utf-8") || "[]");
-      totalRegistered = Array.isArray(usersData) ? usersData.length : 0;
-    }
-  } catch {
-    totalRegistered = 0;
-  }
+export async function calculateAnalyticsSummary(
+  timeRange: "24H" | "7D" | "30D" | "ALL" = "7D"
+): Promise<AnalyticsSummary> {
+  const [events, legacyDownloads, librarySlots, totalRegistered] = await Promise.all([
+    getEvents({ limit: 5000 }),
+    getDownloadEvents(),
+    getLibraryGames(),
+    prisma.user.count(),
+  ]);
 
   const now = Date.now();
   let windowMs: number;
@@ -166,7 +186,6 @@ export function calculateAnalyticsSummary(timeRange: "24H" | "7D" | "30D" | "ALL
   const startTime = windowMs === Infinity ? 0 : now - windowMs;
   const previousStartTime = windowMs === Infinity ? 0 : now - windowMs * 2;
 
-  // Filter events by period
   const periodEvents = events.filter((e) => new Date(e.timestamp).getTime() >= startTime);
   const previousPeriodEvents = events.filter((e) => {
     const t = new Date(e.timestamp).getTime();
@@ -194,7 +213,9 @@ export function calculateAnalyticsSummary(timeRange: "24H" | "7D" | "30D" | "ALL
 
   // Registration metrics
   const newRegistrations = periodEvents.filter((e) => e.eventType === "user.registered").length;
-  const previousRegistrations = previousPeriodEvents.filter((e) => e.eventType === "user.registered").length;
+  const previousRegistrations = previousPeriodEvents.filter(
+    (e) => e.eventType === "user.registered"
+  ).length;
 
   // Engagement & Traffic metrics
   const pageViews = periodEvents.filter((e) => e.eventType === "game.page_view");
@@ -210,16 +231,18 @@ export function calculateAnalyticsSummary(timeRange: "24H" | "7D" | "30D" | "ALL
   const activeUserCount = Math.max(1, wauSet.size);
   const libraryAddsPerActiveUser = Math.round((libraryAdds / activeUserCount) * 10) / 10;
 
-  // Telemetry & Downloads (unifying events + legacy recorded downloads)
+  // Telemetry & Downloads
   const initiatedDownloads = periodEvents.filter((e) => e.eventType === "download.initiated").length;
   const completedEvents = periodEvents.filter((e) => e.eventType === "download.completed");
   const failedEvents = periodEvents.filter((e) => e.eventType === "download.failed");
 
-  // Incorporate legacy downloads table records
   const legacyInWindow = legacyDownloads.filter((dl) => new Date(dl.timestamp).getTime() >= startTime);
   const totalCompletedDownloads = Math.max(completedEvents.length, legacyInWindow.length);
   const totalFailedDownloads = failedEvents.length;
-  const totalDownloadAttempts = Math.max(initiatedDownloads, totalCompletedDownloads + totalFailedDownloads);
+  const totalDownloadAttempts = Math.max(
+    initiatedDownloads,
+    totalCompletedDownloads + totalFailedDownloads
+  );
 
   const successRate =
     totalDownloadAttempts > 0
@@ -287,7 +310,9 @@ export function calculateAnalyticsSummary(timeRange: "24H" | "7D" | "30D" | "ALL
 
   const topGames = Array.from(gameStatsMap.entries())
     .map(([gameId, stat]) => {
-      const matchedSlot = librarySlots.find((s) => s.id === gameId || s.title?.toLowerCase().replace(/\s+/g, "-") === gameId);
+      const matchedSlot = librarySlots.find(
+        (s) => s.id === gameId || s.title?.toLowerCase().replace(/\s+/g, "-") === gameId
+      );
       return {
         gameId,
         title: matchedSlot?.title || gameId,

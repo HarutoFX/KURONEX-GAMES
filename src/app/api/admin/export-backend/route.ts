@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
-import { getCurrentUser, User } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth";
 import { isAdminRole } from "@/lib/security/rbac";
+import prisma from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
@@ -16,18 +15,16 @@ export async function GET() {
       );
     }
 
-    const usersPath = path.join(process.cwd(), "src", "data", "users.json");
-    const rawData = fs.readFileSync(usersPath, "utf-8");
-    const allUsers: User[] = JSON.parse(rawData || "[]");
+    const allUsers = await prisma.user.findMany({
+      orderBy: { createdAt: "asc" },
+    });
 
-    // Filter all administrators
     const adminUsers = allUsers.filter((u) => isAdminRole(u.role));
 
-    // 1. Generate Production SQL Seed (PostgreSQL / Supabase / Neon compatible)
     const sqlValues = adminUsers
       .map(
         (u) =>
-          `  ('${u.id}', '${u.username.replace(/'/g, "''")}', '${u.email.replace(/'/g, "''")}', '${u.passwordHash}', '${u.salt}', '${u.role.toUpperCase()}', '${u.createdAt}', NOW())`
+          `  ('${u.id}', '${u.username.replace(/'/g, "''")}', '${u.email.replace(/'/g, "''")}', '${u.passwordHash}', '${u.salt}', '${u.role.toUpperCase()}', '${u.createdAt.toISOString()}', NOW())`
       )
       .join(",\n");
 
@@ -60,7 +57,6 @@ DO UPDATE SET
   "updated_at" = NOW();
 `;
 
-    // 2. Generate Prisma ORM Seed Snippet
     const prismaSeed = `// prisma/seed.ts (Run with: npx prisma db seed)
 import { PrismaClient } from "@prisma/client";
 
@@ -74,7 +70,7 @@ const adminAccounts = ${JSON.stringify(
         passwordHash: u.passwordHash,
         salt: u.salt,
         role: u.role.toUpperCase(),
-        createdAt: new Date(u.createdAt),
+        createdAt: u.createdAt.toISOString(),
       })),
       null,
       2
@@ -102,7 +98,6 @@ main()
   .finally(() => prisma.$disconnect());
 `;
 
-    // 3. Sanitized JSON export
     const jsonExport = adminUsers.map((u) => ({
       id: u.id,
       username: u.username,
@@ -110,7 +105,7 @@ main()
       passwordHash: u.passwordHash,
       salt: u.salt,
       role: u.role,
-      createdAt: u.createdAt,
+      createdAt: u.createdAt.toISOString(),
     }));
 
     return NextResponse.json(

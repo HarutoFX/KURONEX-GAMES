@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { GradientText } from "@/components/ui/gradient-text";
 import { DeveloperMarquee } from "@/components/developers/DeveloperMarquee";
-import { DeveloperPartner } from "@/lib/library-store";
+import type { DeveloperPartner } from "@/lib/library-store";
 import { SiteNavbar, SiteFooter } from "@/components/ui/navigation";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/AuthContext";
@@ -47,28 +47,57 @@ export default function DevelopersPage() {
   const [selectedTier, setSelectedTier] = useState<string>("All");
   const [pitchForm, setPitchForm] = useState({ studioName: "", email: "", projectTitle: "", message: "" });
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [pitchError, setPitchError] = useState<string | null>(null);
+  const [isSubmittingPitch, setIsSubmittingPitch] = useState(false);
 
   // Portal State
   const [submissions, setSubmissions] = useState<DeveloperSubmissionDto[]>([]);
   const [builds, setBuilds] = useState<ClientBuildDto[]>([]);
+  const [vaultAdds, setVaultAdds] = useState<number>(0);
 
   useEffect(() => {
-    async function loadData() {
+    let ignore = false;
+    async function loadPublicData() {
       try {
-        const [devs, subs, blds] = await Promise.all([
-          developersService.getDevelopers(),
-          developersService.getStudioSubmissions(),
-          developersService.getStudioBuilds(),
-        ]);
-        setDevelopers(devs as unknown as DeveloperPartner[]);
-        setSubmissions(subs);
-        setBuilds(blds);
+        const devs = await developersService.getDevelopers();
+        if (!ignore) {
+          setDevelopers(devs as unknown as DeveloperPartner[]);
+        }
       } catch (err) {
-        console.error("Failed to load developer data:", err);
+        console.error("Failed to load developer directory:", err);
       }
     }
-    loadData();
+    loadPublicData();
+    return () => {
+      ignore = true;
+    };
   }, []);
+
+  useEffect(() => {
+    let ignore = false;
+    async function loadPortalData() {
+      if (!isUserDeveloper) {
+        return;
+      }
+      try {
+        const [overview, blds] = await Promise.all([
+          developersService.getStudioPortalOverview(),
+          developersService.getStudioBuilds(),
+        ]);
+        if (!ignore) {
+          setSubmissions(overview.submissions);
+          setVaultAdds(overview.vaultAdds);
+          setBuilds(blds);
+        }
+      } catch (err) {
+        console.error("Failed to load developer portal data:", err);
+      }
+    }
+    loadPortalData();
+    return () => {
+      ignore = true;
+    };
+  }, [isUserDeveloper]);
 
   const filteredDevs = useMemo(() => {
     if (selectedTier === "All") return developers;
@@ -77,9 +106,19 @@ export default function DevelopersPage() {
 
   const handlePitchSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (pitchForm.studioName && pitchForm.email) {
+    setPitchError(null);
+    if (!pitchForm.studioName.trim() || !pitchForm.email.trim()) {
+      setPitchError("Studio name and contact email are required.");
+      return;
+    }
+    setIsSubmittingPitch(true);
+    try {
       await developersService.submitPitch(pitchForm);
       setIsSubmitted(true);
+    } catch (err) {
+      setPitchError(err instanceof Error ? err.message : "Failed to submit studio application.");
+    } finally {
+      setIsSubmittingPitch(false);
     }
   };
 
@@ -91,20 +130,10 @@ export default function DevelopersPage() {
   };
 
   const handleNewBuild = async (newBuild: Partial<ClientBuildDto>) => {
-    const created: ClientBuildDto = {
-      id: `bld_kx_${Date.now()}`,
-      gameTitle: newBuild.gameTitle || "Frostbound: Omega",
-      versionTag: newBuild.versionTag || "v1.0.0",
-      channel: newBuild.channel || "Beta",
-      targetOs: newBuild.targetOs || "Windows (DirectX 12)",
-      executableName: newBuild.executableName || "game_client.exe",
-      buildSizeBytes: newBuild.buildSizeBytes || 30000000000,
-      sha256Hash: newBuild.sha256Hash || "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      releaseNotes: newBuild.releaseNotes || "General bug fixes and Vulkan pipeline stability.",
-      releasedAt: new Date().toISOString(),
-      status: "Active",
-    };
-    setBuilds((prev) => [created, ...prev]);
+    const res = await developersService.registerBuild(newBuild);
+    if (res.build) {
+      setBuilds((prev) => [res.build, ...prev]);
+    }
   };
 
   return (
@@ -223,6 +252,7 @@ export default function DevelopersPage() {
               <StudioOverviewTab
                 submissions={submissions}
                 builds={builds}
+                vaultAdds={vaultAdds}
                 onNewSubmission={() => setPortalTab("submissions")}
                 onNewBuild={() => setPortalTab("builds")}
               />
@@ -381,6 +411,11 @@ export default function DevelopersPage() {
                 </div>
               ) : (
                 <form onSubmit={handlePitchSubmit} className="space-y-4">
+                  {pitchError && (
+                    <div className="rounded-xl border border-[#FF263D]/40 bg-[#FF263D]/10 px-4 py-2.5 text-xs text-[#FF4054]">
+                      {pitchError}
+                    </div>
+                  )}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-mono uppercase text-[#929292] mb-1">
@@ -436,9 +471,9 @@ export default function DevelopersPage() {
                     />
                   </div>
 
-                  <Button type="submit" variant="primary" className="w-full">
+                  <Button type="submit" variant="primary" className="w-full" disabled={isSubmittingPitch}>
                     <Send className="h-3.5 w-3.5 mr-2" />
-                    <span>Submit Studio Application</span>
+                    <span>{isSubmittingPitch ? "Submitting Application..." : "Submit Studio Application"}</span>
                   </Button>
                 </form>
               )}

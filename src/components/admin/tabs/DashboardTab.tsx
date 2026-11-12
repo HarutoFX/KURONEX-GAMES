@@ -2,10 +2,10 @@
 
 import React from "react";
 import { Users, Activity, Gamepad2, Download } from "lucide-react";
-import { SafeUser } from "@/lib/auth";
-import { LibraryGameSlot } from "@/lib/library-store";
+import type { SafeUser } from "@/lib/auth";
+import type { LibraryGameSlot } from "@/lib/library-store";
 import { GAMES_DATA } from "@/lib/games";
-import { AuditLog } from "@/lib/admin-store";
+import type { AuditLog } from "@/lib/admin-store";
 import { AdminTab } from "@/components/admin/AdminSidebar";
 import { MetricCard } from "@/components/admin/MetricCard";
 import { AnalyticsChart } from "@/components/admin/AnalyticsChart";

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requirePermission } from "@/lib/auth";
-import fs from "fs";
-import path from "path";
+import prisma from "@/lib/prisma";
 import crypto from "crypto";
 
 export const dynamic = "force-dynamic";
@@ -23,19 +22,19 @@ export async function GET(req: NextRequest) {
 
     const services: ServiceHealth[] = [];
 
-    // 1. Database / JSON Store check
+    // 1. Relational Database check (Prisma SQLite / PostgreSQL)
     const dbStart = performance.now();
     let dbStatus: "ONLINE" | "DEGRADED" = "ONLINE";
     try {
-      const usersPath = path.join(process.cwd(), "src", "data", "users.json");
-      fs.accessSync(usersPath, fs.constants.R_OK);
+      await prisma.$queryRawUnsafe("SELECT 1");
+      await prisma.user.count();
     } catch {
       dbStatus = "DEGRADED";
     }
     const dbDuration = Math.round((performance.now() - dbStart) * 10) / 10;
     services.push({
       name: "Database Subsystem",
-      subtext: "Encrypted User & Session Store",
+      subtext: "Prisma Relational Store (Users & Sessions)",
       status: dbStatus,
       latency: `${dbDuration} ms`,
       category: "internal",
@@ -91,7 +90,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(
       {
         timestamp: new Date().toISOString(),
-        overall: "OPERATIONAL",
+        overall: dbStatus === "ONLINE" && authStatus === "OPERATIONAL" ? "OPERATIONAL" : "DEGRADED",
         services,
       },
       { status: 200 }
@@ -101,4 +100,3 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Failed to evaluate platform health" }, { status: 500 });
   }
 }
-

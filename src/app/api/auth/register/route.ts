@@ -77,14 +77,14 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Uniqueness Checks
-    if (findUserByEmail(trimmedEmail)) {
+    if (await findUserByEmail(trimmedEmail)) {
       return NextResponse.json(
         { error: "An account with this email already exists." },
         { status: 409 }
       );
     }
 
-    if (findUserByUsername(trimmedUsername)) {
+    if (await findUserByUsername(trimmedUsername)) {
       return NextResponse.json(
         { error: "This gamertag is already claimed. Please choose another." },
         { status: 409 }
@@ -92,19 +92,20 @@ export async function POST(req: NextRequest) {
     }
 
     // 3. Create User & Session
-    const user = createUser({
+    const user = await createUser({
       username: trimmedUsername,
       email: trimmedEmail,
       password,
       role: role === "developer" ? "developer" : "player",
     });
-    const sessionToken = createSession(user.id, req);
+    const sessionToken = await createSession(user.id, req);
 
     // Track genuine registration event
-    trackEvent({
+    await trackEvent({
       eventType: "user.registered",
       category: "auth",
       userId: user.id,
+      clientIp,
       metadata: { username: user.username },
     });
 

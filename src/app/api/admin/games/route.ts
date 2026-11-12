@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
-    const games = getLibraryGames();
+    const games = await getLibraryGames();
     return NextResponse.json({ games }, { status: 200 });
   } catch (error) {
     console.error("Admin games GET error:", error);
@@ -40,8 +40,8 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Invalid slot category" }, { status: 400 });
       }
 
-      updateLibraryGameSlot(slot);
-      logAdminAction(
+      await updateLibraryGameSlot(slot);
+      await logAdminAction(
         "Updated Game Slot",
         "GAMES",
         slot.title || slot.id,
@@ -53,8 +53,8 @@ export async function POST(req: NextRequest) {
     }
 
     if (Array.isArray(body.games)) {
-      saveLibraryGames(body.games);
-      logAdminAction(
+      await saveLibraryGames(body.games);
+      await logAdminAction(
         "Batch Updated Library Games",
         "GAMES",
         "Cartridge Matrix",

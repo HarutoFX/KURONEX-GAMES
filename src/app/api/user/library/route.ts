@@ -47,11 +47,11 @@ export async function POST(req: NextRequest) {
     }
 
     const validAction = action === "add" || action === "remove" ? action : "toggle";
-    const updatedLibrary = updateUserLibrary(user.id, sanitizedGameId, validAction);
+    const updatedLibrary = await updateUserLibrary(user.id, sanitizedGameId, validAction);
 
     // Track genuine library engagement event
     const wasAdded = updatedLibrary.includes(sanitizedGameId);
-    trackEvent({
+    await trackEvent({
       eventType: wasAdded ? "library.game_added" : "library.game_removed",
       category: "engagement",
       userId: user.id,
@@ -81,9 +81,9 @@ export async function DELETE(req: NextRequest) {
     }
 
     const sanitizedGameId = gameId.trim().replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64);
-    const updatedLibrary = updateUserLibrary(user.id, sanitizedGameId, "remove");
+    const updatedLibrary = await updateUserLibrary(user.id, sanitizedGameId, "remove");
 
-    trackEvent({
+    await trackEvent({
       eventType: "library.game_removed",
       category: "engagement",
       userId: user.id,

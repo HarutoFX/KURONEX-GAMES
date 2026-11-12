@@ -6,13 +6,10 @@ import {
   ObservabilitySnapshot,
   OperationalAlert,
 } from "./types";
-import { safeReadJsonSync, atomicWriteJsonSync } from "@/lib/db/atomic-store";
-import { getEvents } from "./event-tracker";
 
-const ALERTS_FILE = path.join(process.cwd(), "src", "data", "alerts.json");
 const PROCESS_START_TIME = Date.now();
 
-// Circular buffer of the last 1,000 request metrics
+// Circular buffer of the last 1,000 request metrics (kept in memory for fast proxy/middleware recording)
 const requestMetricsBuffer: RequestLatencyMetric[] = [];
 const MAX_METRICS_BUFFER_SIZE = 1000;
 
@@ -43,19 +40,20 @@ function calculatePercentile(samples: number[], percentile: number): number {
 /**
  * Performs genuine active health checks on platform subsystems.
  */
-function evaluateSubsystemHealth(): ObservabilitySnapshot["subsystems"] {
+async function evaluateSubsystemHealth(): Promise<ObservabilitySnapshot["subsystems"]> {
+  const { default: prisma } = await import("@/lib/prisma");
   const subsystems: ObservabilitySnapshot["subsystems"] = [];
 
-  // 1. Database Store (Users & Sessions Persistence)
+  // 1. Relational Database Subsystem (Prisma SQLite / PostgreSQL)
   const dbStart = performance.now();
   let dbStatus: "OPERATIONAL" | "DEGRADED" = "OPERATIONAL";
-  let dbMessage = "Atomic write-then-rename verified; users and sessions operational.";
+  let dbMessage = "Prisma relational database verified; users and sessions operational.";
   try {
-    const usersPath = path.join(process.cwd(), "src", "data", "users.json");
-    fs.accessSync(usersPath, fs.constants.R_OK);
+    await prisma.$queryRawUnsafe("SELECT 1");
+    await prisma.user.count();
   } catch (err) {
     dbStatus = "DEGRADED";
-    dbMessage = `Filesystem read check failed: ${err instanceof Error ? err.message : "Access denied"}`;
+    dbMessage = `Database query check failed: ${err instanceof Error ? err.message : "Access denied"}`;
   }
   const dbLatency = Math.round((performance.now() - dbStart) * 10) / 10;
   subsystems.push({
@@ -128,7 +126,7 @@ function evaluateSubsystemHealth(): ObservabilitySnapshot["subsystems"] {
     status: "NOT_CONFIGURED",
     latencyMs: null,
     lastChecked: new Date().toISOString(),
-    message: "External notification webhook unconfigured. Storing alerts in audit log.",
+    message: "External notification webhook unconfigured. Storing alerts in database.",
   });
 
   return subsystems;
@@ -137,14 +135,32 @@ function evaluateSubsystemHealth(): ObservabilitySnapshot["subsystems"] {
 /**
  * Evaluates active alert conditions against real telemetry.
  */
-export function evaluateAlertConditions(): OperationalAlert[] {
-  const existingAlerts = safeReadJsonSync<OperationalAlert[]>(ALERTS_FILE, []);
+export async function evaluateAlertConditions(): Promise<OperationalAlert[]> {
+  const { default: prisma } = await import("@/lib/prisma");
+  const { getEvents } = await import("./event-tracker");
+
+  const existingRows = await prisma.operationalAlert.findMany({
+    orderBy: { triggerTime: "desc" },
+    take: 50,
+  });
+  const existingAlerts: OperationalAlert[] = existingRows.map((a) => ({
+    id: a.id,
+    code: a.code as OperationalAlert["code"],
+    title: a.title,
+    message: a.message,
+    severity: a.severity as OperationalAlert["severity"],
+    triggerTime: a.triggerTime.toISOString(),
+    resolvedTime: a.resolvedTime ? a.resolvedTime.toISOString() : undefined,
+    isActive: a.isActive,
+    deliveryStatus: a.deliveryStatus as OperationalAlert["deliveryStatus"],
+  }));
+
   const now = Date.now();
   const oneMinuteAgo = now - 60 * 1000;
   const fifteenMinutesAgo = now - 15 * 60 * 1000;
 
   const recentMetrics = requestMetricsBuffer.filter((m) => m.timestamp >= oneMinuteAgo);
-  const recentEvents = getEvents({ sinceMs: fifteenMinutesAgo });
+  const recentEvents = await getEvents({ sinceMs: fifteenMinutesAgo });
 
   const activeAlerts: OperationalAlert[] = [];
 
@@ -181,7 +197,7 @@ export function evaluateAlertConditions(): OperationalAlert[] {
     });
   }
 
-  // Condition 3: Auth Brute-Force Spike (AUTH_BRUTE_FORCE_SPIKE: > 5 failed logins or auth errors in 15 minutes)
+  // Condition 3: Auth Brute-Force Spike (AUTH_BRUTE_FORCE_SPIKE: >= 5 failed logins in 15 minutes)
   const failedLogins = recentEvents.filter(
     (e) => e.eventType === "user.login" && e.metadata?.status === "failed"
   );
@@ -198,32 +214,46 @@ export function evaluateAlertConditions(): OperationalAlert[] {
     });
   }
 
-  // Deduplicate and persist active alerts
-  const alertMap = new Map<string, OperationalAlert>();
-  for (const ea of existingAlerts) {
-    alertMap.set(ea.id, ea);
-  }
   for (const na of activeAlerts) {
-    alertMap.set(na.id, na);
+    try {
+      await prisma.operationalAlert.upsert({
+        where: { id: na.id },
+        update: {
+          title: na.title,
+          message: na.message,
+          severity: na.severity,
+          isActive: na.isActive,
+        },
+        create: {
+          id: na.id,
+          code: na.code,
+          title: na.title,
+          message: na.message,
+          severity: na.severity,
+          triggerTime: new Date(na.triggerTime),
+          isActive: na.isActive,
+          deliveryStatus: na.deliveryStatus,
+        },
+      });
+    } catch (err) {
+      console.error("[OBSERVABILITY ERROR] Failed to save alert:", err);
+    }
   }
 
-  const merged = Array.from(alertMap.values())
+  const alertMap = new Map<string, OperationalAlert>();
+  for (const ea of existingAlerts) alertMap.set(ea.id, ea);
+  for (const na of activeAlerts) alertMap.set(na.id, na);
+
+  return Array.from(alertMap.values())
     .sort((a, b) => new Date(b.triggerTime).getTime() - new Date(a.triggerTime).getTime())
     .slice(0, 50);
-
-  try {
-    atomicWriteJsonSync(ALERTS_FILE, merged);
-  } catch (err) {
-    console.error("[OBSERVABILITY ERROR] Failed to save alerts:", err);
-  }
-
-  return merged;
 }
 
 /**
  * Returns complete real-time system observability snapshot.
  */
-export function getObservabilitySnapshot(): ObservabilitySnapshot {
+export async function getObservabilitySnapshot(): Promise<ObservabilitySnapshot> {
+  const { getEvents } = await import("./event-tracker");
   const now = Date.now();
   const uptimeSeconds = Math.floor((now - PROCESS_START_TIME) / 1000);
 
@@ -243,22 +273,30 @@ export function getObservabilitySnapshot(): ObservabilitySnapshot {
     latencies.push(m.durationMs);
   }
 
-  // Include persisted platform events if the in-memory circular buffer is cold
-  const persistedEvents = getEvents({ limit: 1000 });
+  const persistedEvents = await getEvents({ limit: 1000 });
   const effectiveTotalRequests = Math.max(totalRequests, persistedEvents.length);
   const effectiveSuccessCount = Math.max(successCount, persistedEvents.length);
 
   const totalErrors = clientErrorCount + serverErrorCount;
-  const errorRatePercent = effectiveTotalRequests > 0 ? Math.round((totalErrors / effectiveTotalRequests) * 1000) / 10 : 0;
+  const errorRatePercent =
+    effectiveTotalRequests > 0
+      ? Math.round((totalErrors / effectiveTotalRequests) * 1000) / 10
+      : 0;
   const averageLatencyMs =
-    latencies.length > 0 ? Math.round((latencies.reduce((a, b) => a + b, 0) / latencies.length) * 10) / 10 : 0;
+    latencies.length > 0
+      ? Math.round((latencies.reduce((a, b) => a + b, 0) / latencies.length) * 10) / 10
+      : 0;
 
+  // Latency percentiles: p50, p95, p99
+  const p50LatencyMs = calculatePercentile(latencies, 50);
   const p95LatencyMs = calculatePercentile(latencies, 95);
   const p99LatencyMs = calculatePercentile(latencies, 99);
-  const requestsPerMinute = Math.max(recentMetrics.length, 1);
+  const requestsPerMinute = recentMetrics.length;
 
-  const subsystems = evaluateSubsystemHealth();
-  const alerts = evaluateAlertConditions();
+  const [subsystems, alerts] = await Promise.all([
+    evaluateSubsystemHealth(),
+    evaluateAlertConditions(),
+  ]);
 
   return {
     timestamp: new Date().toISOString(),
@@ -270,7 +308,7 @@ export function getObservabilitySnapshot(): ObservabilitySnapshot {
       clientErrorCount,
       serverErrorCount,
       errorRatePercent,
-      averageLatencyMs,
+      averageLatencyMs: averageLatencyMs || p50LatencyMs,
       p95LatencyMs,
       p99LatencyMs,
       requestsPerMinute,
@@ -282,4 +320,3 @@ export function getObservabilitySnapshot(): ObservabilitySnapshot {
 
 // Alias for semantic clarity
 export const evaluateOperationalAlerts = evaluateAlertConditions;
-

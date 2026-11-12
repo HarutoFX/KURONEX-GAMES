@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { Plus, X } from "lucide-react";
-import { Announcement } from "@/lib/admin-store";
+import type { Announcement } from "@/lib/admin-store";
 
 interface AnnouncementsTabProps {
   announcements: Announcement[];

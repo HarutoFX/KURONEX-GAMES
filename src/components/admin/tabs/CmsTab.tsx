@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { X, Plus } from "lucide-react";
-import { DeveloperPartner } from "@/lib/library-store";
+import type { DeveloperPartner } from "@/lib/library-store";
 
 interface CmsTabProps {
   filteredDevelopers: DeveloperPartner[];

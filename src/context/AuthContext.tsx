@@ -7,7 +7,15 @@ export interface SafeUser {
   username: string;
   email: string;
   createdAt: string;
-  role: "player" | "developer" | "admin";
+  role:
+    | "player"
+    | "developer"
+    | "analyst"
+    | "content_manager"
+    | "game_manager"
+    | "moderator"
+    | "admin"
+    | "super_admin";
 }
 
 interface AuthContextType {

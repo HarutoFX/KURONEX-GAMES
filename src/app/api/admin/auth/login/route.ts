@@ -73,13 +73,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    let user = findUserByEmail(loginId);
+    let user = await findUserByEmail(loginId);
     if (!user) {
-      user = findUserByUsername(loginId);
+      user = await findUserByUsername(loginId);
     }
 
     if (!user) {
-      recordFailedLogin(loginId);
+      const attempt = recordFailedLogin(loginId);
+      if (attempt.locked) {
+        return NextResponse.json(
+          {
+            error: `Administrator account temporarily locked. Please try again in ${attempt.remainingSeconds} seconds.`,
+            retryAfter: attempt.remainingSeconds,
+          },
+          { status: 429, headers: { "Retry-After": String(attempt.remainingSeconds) } }
+        );
+      }
       return NextResponse.json(
         { error: "Invalid administrator credentials." },
         { status: 401 }
@@ -89,7 +98,7 @@ export async function POST(req: NextRequest) {
     // Verify Administrative Role
     if (!isAdminRole(user.role)) {
       recordFailedLogin(loginId);
-      logAdminAction(
+      await logAdminAction(
         "ADMIN_LOGIN_UNAUTHORIZED_ROLE",
         "AUTH",
         user.id,
@@ -106,8 +115,8 @@ export async function POST(req: NextRequest) {
     // Verify Password
     const isValid = verifyPassword(password, user.passwordHash, user.salt);
     if (!isValid) {
-      const remainingAttempts = recordFailedLogin(loginId);
-      logAdminAction(
+      const attempt = recordFailedLogin(loginId);
+      await logAdminAction(
         "ADMIN_LOGIN_FAILED",
         "AUTH",
         user.id,
@@ -115,9 +124,18 @@ export async function POST(req: NextRequest) {
         user.username,
         "FAILED"
       );
+      if (attempt.locked) {
+        return NextResponse.json(
+          {
+            error: `Administrator account temporarily locked. Please try again in ${attempt.remainingSeconds} seconds.`,
+            retryAfter: attempt.remainingSeconds,
+          },
+          { status: 429, headers: { "Retry-After": String(attempt.remainingSeconds) } }
+        );
+      }
       return NextResponse.json(
         {
-          error: `Invalid administrator credentials. ${remainingAttempts} attempts remaining before temporary lockout.`,
+          error: `Invalid administrator credentials. ${attempt.remainingAttempts} attempts remaining before temporary lockout.`,
         },
         { status: 401 }
       );
@@ -132,9 +150,9 @@ export async function POST(req: NextRequest) {
 
     recordSuccessfulLogin(loginId);
 
-    const sessionToken = createSession(user.id, req);
+    const sessionToken = await createSession(user.id, req);
 
-    logAdminAction(
+    await logAdminAction(
       "ADMIN_LOGIN_SUCCESS",
       "AUTH",
       user.id,
@@ -143,7 +161,7 @@ export async function POST(req: NextRequest) {
       "SUCCESS"
     );
 
-    const isSecure = process.env.NODE_ENV === "production";
+    const isSecure = process.env.NODE_ENV === "production" || process.env.SECURE_COOKIES === "true";
     const cookieOptions = {
       path: "/",
       httpOnly: true,
@@ -163,7 +181,7 @@ export async function POST(req: NextRequest) {
     );
 
     response.cookies.set(SESSION_COOKIE_NAME, sessionToken, cookieOptions);
-    response.cookies.set(LEGACY_SESSION_COOKIE_NAME, sessionToken, cookieOptions);
+    response.cookies.set(LEGACY_SESSION_COOKIE_NAME, "", { ...cookieOptions, maxAge: 0 });
 
     return response;
   } catch (error) {

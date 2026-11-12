@@ -40,7 +40,17 @@ function validateAllData() {
     emails.add(u.email.toLowerCase());
 
     if (!u.passwordHash || !u.salt) errors.push(`User ${u.username} missing cryptographic passwordHash or salt`);
-    if (!["player", "developer", "admin", "super_admin"].includes(u.role)) errors.push(`Invalid role '${u.role}' for user ${u.username}`);
+    const validRoles = [
+      "player",
+      "developer",
+      "analyst",
+      "content_manager",
+      "game_manager",
+      "moderator",
+      "admin",
+      "super_admin",
+    ];
+    if (!validRoles.includes(u.role)) errors.push(`Invalid role '${u.role}' for user ${u.username}`);
 
     if (u.role === "admin" || u.role === "super_admin") {
       adminFound = true;

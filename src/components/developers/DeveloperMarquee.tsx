@@ -2,7 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { DeveloperPartner } from "@/lib/library-store";
+import type { DeveloperPartner } from "@/lib/library-store";
 import { Sparkles, Compass, ShieldCheck, Flame, Cpu, Trees, Layers, Zap } from "lucide-react";
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
